@@ -2,15 +2,6 @@ from torch import optim
 from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingWarmRestarts
 from module.lr_scheduler import CosineAnnealingWarmUpRestarts, YoloLR
 
-from models.backbone.darknet import darknet19
-
-
-def get_model(model_name):
-    model_dict = {
-        'darknet19': darknet19
-    }
-    return model_dict.get(model_name)
-
 
 def get_optimizer(optimizer_name, params, **kwargs):
     optim_dict = {
