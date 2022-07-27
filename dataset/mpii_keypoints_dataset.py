@@ -1,6 +1,5 @@
 import sys
 import os
-from tkinter import Y
 sys.path.append(os.getcwd())
 from glob import glob
 import json
@@ -12,7 +11,6 @@ import cv2
 import numpy as np
 import pytorch_lightning as pl
 import albumentations as A
-from albumentations.pytorch import ToTensorV2
 
 from dataset.keypoints_utils import HeatmapGenerator, DisplacementGenerator, MaskGenerator, DecodeSPM
 
@@ -162,14 +160,14 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
         
     def setup(self, stage=None):
         train_transforms = A.Compose([
-            A.ChannelShuffle(),
-            A.CLAHE(),
-            A.ColorJitter(
-                brightness=0.5,
-                contrast=0.2,
-                saturation=0.5,
-                hue=0.1
-            ),
+            # A.ChannelShuffle(),
+            # A.CLAHE(),
+            # A.ColorJitter(
+            #     brightness=0.5,
+            #     contrast=0.2,
+            #     saturation=0.5,
+            #     hue=0.1
+            # ),
             A.Resize(self.input_size, self.input_size),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy'))
@@ -223,8 +221,8 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
 if __name__ == '__main__':
     cfg = dict()
 
-    # cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
-    cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
+    cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
+    # cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
     # cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
     cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
     cfg['img_dir'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
@@ -269,6 +267,8 @@ if __name__ == '__main__':
         img = (img * 255).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
+        heatmaps = target[0, 0, :, :].numpy()
+
         root_joints, keypoints_joint = spm_decoder(target)
 
         # Draw Root joints
@@ -283,6 +283,7 @@ if __name__ == '__main__':
                 cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
 
         cv2.imshow('image', img)
+        cv2.imshow('heatmaps', heatmaps)
         key = cv2.waitKey(0)
         if key == 27:
             break

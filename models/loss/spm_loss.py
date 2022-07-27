@@ -16,10 +16,10 @@ class SPMLoss(nn.Module):
     def __init__(self):
         super().__init__()
         # weight factor to balance two kinds of losses
-        self.lambda_disp = 0.01
+        self.lambda_disp = 1.
         
         self.mse_loss = nn.MSELoss(reduction='mean')
-        self.bce_loss = nn.BCELoss(reduction='mean')
+        self.sl1_loss = nn.SmoothL1Loss(reduction='mean')
 
     def forward(self, input, target):
         """
@@ -52,15 +52,16 @@ class SPMLoss(nn.Module):
         # ===================================== #
         #   FOR Body Joint Displacement LOSS    #
         # ===================================== #
-        loss_positive_displacements = self.mse_loss(pred_displacements * mask, true_displacements * mask)
-        loss_negative_displacements = self.lambda_disp * self.mse_loss(pred_displacements * n_mask, true_displacements * n_mask)
+        # loss_positive_displacements = self.sl1_loss(pred_displacements * mask, true_displacements * mask)
+        # loss_negative_displacements = self.lambda_disp * self.sl1_loss(pred_displacements * n_mask, true_displacements * n_mask)
 
-        loss_displacements = loss_positive_displacements + loss_negative_displacements
+        # loss_displacements = loss_positive_displacements + loss_negative_displacements
+
+        loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements, true_displacements)
 
         loss = (loss_root_joints + loss_displacements) * batch_size
 
         return loss
-
 
     def encode_target(self, target):
         """SPM Loss Function

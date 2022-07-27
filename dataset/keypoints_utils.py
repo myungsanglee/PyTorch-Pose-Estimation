@@ -153,6 +153,9 @@ def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
     sorted_yy = yy[argsort_index]
     sorted_xx = xx[argsort_index]
 
+    if sorted_heatmaps_confidence.size(0) == 0:
+        return sorted_heatmaps_confidence
+
     # heatmaps nms
     root_joints_confidence = [] 
     root_joints = []
@@ -192,9 +195,7 @@ def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
 
 
 def get_keypoints(root_joints, displacements):
-    """NMS heatmaps of the SPM model
-    
-    Convert heatmaps to root joints info
+    """Get Body Joint Keypoints
 
     Arguments:
         root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y]
@@ -205,9 +206,10 @@ def get_keypoints(root_joints, displacements):
     """
     num_keypoints, output_size, _ = displacements.size()
     num_keypoints = int(num_keypoints / 2)
-    # [2, num_keypoints, output_size, output_size] to [output_size, output_size, num_keypoints, 2]
-    # displacements = displacements.view(2, -1, output_size, output_size).permute(2, 3, 1, 0).contiguous()
-    # print(displacements.size())
+    
+    if root_joints.size(0) == 0:
+        return root_joints
+
     keypoints_joint = []
     for root_joint in root_joints:
         x, y = root_joint
@@ -222,6 +224,18 @@ def get_keypoints(root_joints, displacements):
 
 class DecodeSPM(nn.Module):
     '''Decode SPM predictions to center(root joints) & keypoints joint
+    
+    Arguments:
+        input_size (Int): Image input size 
+        sigma (Int): 2D Gaussian Filter, size = 6*sigma + 3
+        conf_threshold (Float): root joint confidence threshold value
+        pred (Bool): True - for Predictions, False - for Targets
+        x (Tensor): Predictions: [batch, nstack, 1 + (2*num_keypoints), output_size, output_size] or 
+                    Targets: [batch, 1 + (2*num_keypoints), output_size, output_size]
+
+    Returns:
+        root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y], scaled input size
+        keypoints_joint (Tensor): keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y], scaled input size
     '''
     def __init__(self, input_size, sigma, conf_threshold, pred=True):
         super().__init__()
@@ -236,6 +250,7 @@ class DecodeSPM(nn.Module):
         output_size = x.size(-1)
 
         if self.pred:
+            x = torch.mean(x, dim=1) # [batch, nstack, 1 + (2*num_keypoints), output_size, output_size] to [batch, 1 + (2*num_keypoints), output_size, output_size]
             heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
             displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
         else:
@@ -251,3 +266,30 @@ class DecodeSPM(nn.Module):
         keypoints_joint = keypoints_joint * self.input_size / output_size
 
         return root_joints, keypoints_joint
+
+
+def get_tagged_img(img, root_joints, keypoints_joint):
+    '''Return Tagged Image
+    
+    Arguments:
+        img (Numpy): Image Array of Numpy or OpenCV 
+        root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y], scaled input size
+        keypoints_joint (Tensor): keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y], scaled input size
+    
+    Returns:
+        img (Numpy): Tagged Image Array of Numpy or OpenCV 
+    '''
+    tagged_img = img.copy()
+
+    # Draw Root joints
+    for x, y in root_joints:
+        x, y = int(x), int(y)
+        cv2.circle(tagged_img, (x, y), 3, (0, 0, 255), -1)
+
+    # Draw keypoints joint
+    for joints in keypoints_joint:
+        for x, y in joints:
+            x, y = int(x), int(y)
+            cv2.circle(tagged_img, (x, y), 3, (255, 0, 0), -1)
+
+    return tagged_img

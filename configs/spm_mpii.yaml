@@ -1,10 +1,12 @@
 model : 'spm'
-backbone: 'darknet19'
-dataset_name : 'mpii-keypoints'
+dataset_name : 'tmp-mpii-keypoints'
 input_size: 512
-output_size: 256
+output_size: 128
 in_channels: 3
 num_keypoints : 16
+nstack : 1 # stack number of Hourglass Module
+inp_dim : 256 # input channel of Hourglass Module
+oup_dim : 33 # ouput channel of Model, 1 + (2 * num_keypoints), 1 for root joint & the others for displacement map
 sigma: 2 # 2D Gaussian Filter, size = 6*sigma + 3
 class_labels : [
   'r_ankle', 
@@ -25,13 +27,13 @@ class_labels : [
   'l_wrist'
 ]
 
-epochs: 365
+epochs: 1000
 
-train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
-val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
+train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_data.json'
+val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_data.json'
 img_dir : '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
-workers: 32 # number of workers to generate data
-batch_size: 64
+workers: 2 # number of workers to generate data
+batch_size: 1
 
 save_dir : './saved' # dir for saving log, weights
 save_freq: 5
@@ -41,7 +43,7 @@ trainer_options:
   num_sanity_val_steps: 0
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
-devices: [0] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
+devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 # optimizer: 'adam'
 # optimizer_options:
@@ -63,6 +65,7 @@ optimizer_options:
   lr: 1e-3
   momentum: 0.9
   weight_decay: 5e-4
+  nesterov: True
 
 # scheduler: 'multi_step'
 # scheduler_options:
@@ -85,6 +88,6 @@ optimizer_options:
 
 scheduler: 'yolo_lr'
 scheduler_options:
-  burn_in: 1000
-  steps: [40000, 60000]
+  burn_in: 10
+  steps: [800, 900]
   scales: [0.1, 0.1]

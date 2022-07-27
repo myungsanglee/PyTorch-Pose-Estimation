@@ -16,10 +16,18 @@ class SPMDetector(pl.LightningModule):
         return predictions
 
     def training_step(self, batch, batch_idx):
-        pred = self.model(batch['img'])
-        loss = self.loss_fn(pred, batch['annot'])
+        cfg = self.hparams.cfg
 
-        self.log('train_loss', loss, prog_bar=True, logger=True)
+        img, target = batch
+        pred = self.model(img)
+
+        total_loss = 0
+        for idx in range(cfg['nstack']):
+            tmp_pred = pred[:, idx, :, :, :]
+            loss = self.loss_fn(tmp_pred, target)
+            total_loss += loss
+
+        self.log('train_loss', total_loss, prog_bar=True, logger=True)
 
         return loss
 
@@ -27,10 +35,18 @@ class SPMDetector(pl.LightningModule):
     #     self.map_metric.reset_states()
 
     def validation_step(self, batch, batch_idx):
-        pred = self.model(batch['img'])
-        loss = self.loss_fn(pred, batch['annot'])
+        cfg = self.hparams.cfg
 
-        self.log('val_loss', loss, prog_bar=True, logger=True)
+        img, target = batch
+        pred = self.model(img)
+
+        total_loss = 0
+        for idx in range(cfg['nstack']):
+            tmp_pred = pred[:, idx, :, :, :]
+            loss = self.loss_fn(tmp_pred, target)
+            total_loss += loss
+
+        self.log('val_loss', total_loss, prog_bar=True, logger=True)
 
         # self.map_metric.update_state(batch['annot'], pred)        
 
