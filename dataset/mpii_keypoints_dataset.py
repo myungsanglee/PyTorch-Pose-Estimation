@@ -138,36 +138,47 @@ class MPIIKeypointsDataset(Dataset):
         return joints, centers
 
 class MPIIKeypointsDataModule(pl.LightningDataModule):
-    def __init__(self, cfg):
+    def __init__(
+        self, 
+        train_path, 
+        val_path,
+        img_dir,
+        input_size,
+        output_size,
+        num_keypoints,
+        sigma,
+        workers,
+        batch_size
+    ):
         super().__init__()
-        self.train_path = cfg['train_path']
-        self.val_path = cfg['val_path']
-        self.img_dir = cfg['img_dir']
-        self.workers = cfg['workers']
-        self.input_size = cfg['input_size']
-        self.output_size = cfg['output_size']
-        self.batch_size = cfg['batch_size']
+        self.train_path = train_path
+        self.val_path = val_path
+        self.img_dir = img_dir
+        self.workers = workers
+        self.input_size = input_size
+        self.output_size = output_size
+        self.batch_size = batch_size
         self.heatmap_generator = HeatmapGenerator(
-            cfg['output_size'], 1, cfg['sigma']
+            output_size, 1, sigma
         )
         self.displacement_generator = DisplacementGenerator(
-            cfg['output_size'], cfg['num_keypoints']
+            output_size, num_keypoints
         )
         self.mask_generator = MaskGenerator(
-            cfg['output_size'], cfg['sigma']
+            output_size, sigma
         )
         self.ratio = self.output_size / self.input_size
         
     def setup(self, stage=None):
         train_transforms = A.Compose([
-            # A.ChannelShuffle(),
-            # A.CLAHE(),
-            # A.ColorJitter(
-            #     brightness=0.5,
-            #     contrast=0.2,
-            #     saturation=0.5,
-            #     hue=0.1
-            # ),
+            A.ChannelShuffle(),
+            A.CLAHE(),
+            A.ColorJitter(
+                brightness=0.5,
+                contrast=0.2,
+                saturation=0.5,
+                hue=0.1
+            ),
             A.Resize(self.input_size, self.input_size),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy'))

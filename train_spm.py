@@ -16,7 +16,15 @@ from utils.yaml_helper import get_configs
 
 def train(cfg):
     data_module = MPIIKeypointsDataModule(
-        cfg=cfg
+        train_path = cfg['train_path'],
+        val_path = cfg['val_path'],
+        img_dir = cfg['img_dir'],
+        input_size = cfg['input_size'],
+        output_size = cfg['output_size'],
+        num_keypoints = cfg['num_keypoints'],
+        sigma = cfg['sigma'],
+        workers = cfg['workers'],
+        batch_size = cfg['batch_size'],
     )
 
     model = PoseNet(

@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     tmp_input = torch.randn((1, 3, input_size, input_size))
 
-    model = PoseNet(nstack=1, inp_dim=256, oup_dim=33)
+    model = PoseNet(nstack=8, inp_dim=256, oup_dim=33)
 
     torchsummary.summary(model, (3, input_size, input_size), batch_size=1, device='cpu')
 

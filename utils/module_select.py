@@ -8,7 +8,8 @@ def get_optimizer(optimizer_name, params, **kwargs):
         'sgd': optim.SGD, 
         'adam': optim.Adam,
         'radam': optim.RAdam,
-        'adamw': optim.AdamW
+        'adamw': optim.AdamW,
+        'rmsprop': optim.RMSprop
     }
     optimizer = optim_dict.get(optimizer_name)
     if optimizer:

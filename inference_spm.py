@@ -17,7 +17,17 @@ def inference(cfg, ckpt):
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]= ','.join(str(num) for num in cfg['devices'])
 
-    data_module = MPIIKeypointsDataModule(cfg)
+    data_module = MPIIKeypointsDataModule(
+        train_path = cfg['train_path'],
+        val_path = cfg['val_path'],
+        img_dir = cfg['img_dir'],
+        input_size = cfg['input_size'],
+        output_size = cfg['output_size'],
+        num_keypoints = cfg['num_keypoints'],
+        sigma = cfg['sigma'],
+        workers = cfg['workers'],
+        batch_size = 1,
+    )
     data_module.prepare_data()
     data_module.setup()
     
@@ -37,7 +47,7 @@ def inference(cfg, ckpt):
     )
     model_module.eval()
 
-    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.1, True)
+    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.5, True)
     true_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
 
     # Inference
@@ -63,10 +73,10 @@ def inference(cfg, ckpt):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         pred_img = get_tagged_img(img, pred_root_joints, pred_keypoints_joint)
-        true_img = get_tagged_img(img, true_root_joints, true_keypoints_joint)
+        # true_img = get_tagged_img(img, true_root_joints, true_keypoints_joint)
 
         cv2.imshow('pred', pred_img)
-        cv2.imshow('true', true_img)
+        # cv2.imshow('true', true_img)
         key = cv2.waitKey(0)
         if key == 27:
             break

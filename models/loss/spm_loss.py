@@ -8,15 +8,14 @@ from torch import nn
 
 class SPMLoss(nn.Module):
     """SPM Loss Function
-
-    Arguments:
-      num_keypoints (int): Number of keypoints in the dataset
     """
     
     def __init__(self):
         super().__init__()
         # weight factor to balance two kinds of losses
-        self.lambda_disp = 1.
+        self.lambda_root = 1
+        self.lambda_disp_pos = 1
+        self.lambda_disp_neg = 0.01
         
         self.mse_loss = nn.MSELoss(reduction='mean')
         self.sl1_loss = nn.SmoothL1Loss(reduction='mean')
@@ -47,19 +46,16 @@ class SPMLoss(nn.Module):
         # ======================== #
         #   FOR Root Joints Loss   #
         # ======================== #
-        loss_root_joints = self.mse_loss(pred_root_joints, true_root_joints)
+        loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints * mask[..., 0], true_root_joints)
 
         # ===================================== #
         #   FOR Body Joint Displacement LOSS    #
         # ===================================== #
-        # loss_positive_displacements = self.sl1_loss(pred_displacements * mask, true_displacements * mask)
-        # loss_negative_displacements = self.lambda_disp * self.sl1_loss(pred_displacements * n_mask, true_displacements * n_mask)
+        loss_positive_displacements = self.lambda_disp_pos * self.mse_loss(pred_displacements * mask, true_displacements)
+        loss_negative_displacements = self.lambda_disp_neg * self.mse_loss(pred_displacements * n_mask, true_displacements * n_mask)
 
-        # loss_displacements = loss_positive_displacements + loss_negative_displacements
-
-        loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements, true_displacements)
-
-        loss = (loss_root_joints + loss_displacements) * batch_size
+        # loss = (loss_root_joints + loss_positive_displacements + loss_negative_displacements) * batch_size
+        loss = (loss_root_joints) * batch_size
 
         return loss
 

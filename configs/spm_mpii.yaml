@@ -4,7 +4,7 @@ input_size: 512
 output_size: 128
 in_channels: 3
 num_keypoints : 16
-nstack : 1 # stack number of Hourglass Module
+nstack : 8 # stack number of Hourglass Module
 inp_dim : 256 # input channel of Hourglass Module
 oup_dim : 33 # ouput channel of Model, 1 + (2 * num_keypoints), 1 for root joint & the others for displacement map
 sigma: 2 # 2D Gaussian Filter, size = 6*sigma + 3
@@ -27,13 +27,13 @@ class_labels : [
   'l_wrist'
 ]
 
-epochs: 1000
+epochs: 300
 
-train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_data.json'
-val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_data.json'
+train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
+val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
 img_dir : '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
 workers: 2 # number of workers to generate data
-batch_size: 1
+batch_size: 2
 
 save_dir : './saved' # dir for saving log, weights
 save_freq: 5
@@ -41,14 +41,15 @@ save_freq: 5
 trainer_options:
   check_val_every_n_epoch: 5
   num_sanity_val_steps: 0
+  log_every_n_steps: 3
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
 devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 # optimizer: 'adam'
 # optimizer_options:
-#   lr: 0
-#   weight_decay: 1e-5
+#   lr: 1e-4
+#   weight_decay: 5e-4
 
 # optimizer: 'radam'
 # optimizer_options:
@@ -59,6 +60,14 @@ devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 # optimizer_options:
 #   lr: 0
 #   weight_decay: 1e-5
+
+# optimizer: 'rmsprop'
+# optimizer_options:
+#   lr: 1e-4
+#   momentum: 0.9
+#   weight_decay: 5e-4
+#   eps: 0.0316
+#   alpha: 0.9
 
 optimizer: 'sgd'
 optimizer_options:
@@ -88,6 +97,6 @@ optimizer_options:
 
 scheduler: 'yolo_lr'
 scheduler_options:
-  burn_in: 10
-  steps: [800, 900]
+  burn_in: 15
+  steps: [500, 600]
   scales: [0.1, 0.1]
