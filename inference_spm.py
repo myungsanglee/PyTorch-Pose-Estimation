@@ -8,7 +8,8 @@ import cv2
 
 from utils.yaml_helper import get_configs
 from module.spm_module import SPMDetector
-from models.detector.spm import PoseNet
+from models.detector.spm import PoseNet, SPM
+from models.backbone.darknet import darknet19
 from dataset.keypoints_utils import DecodeSPM, get_tagged_img
 from dataset.mpii_keypoints_dataset import MPIIKeypointsDataModule
 
@@ -31,10 +32,15 @@ def inference(cfg, ckpt):
     data_module.prepare_data()
     data_module.setup()
     
-    model = PoseNet(
-        nstack=cfg['nstack'], 
-        inp_dim=cfg['inp_dim'], 
-        oup_dim=cfg['oup_dim']
+    # model = PoseNet(
+    #     nstack=cfg['nstack'], 
+    #     inp_dim=cfg['inp_dim'], 
+    #     oup_dim=cfg['oup_dim']
+    # )
+    
+    model = SPM(
+        backbone=darknet19(), 
+        num_keypoints=cfg['num_keypoints']
     )
 
     if torch.cuda.is_available:
@@ -47,12 +53,12 @@ def inference(cfg, ckpt):
     )
     model_module.eval()
 
-    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.5, True)
+    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.2 , True)
     true_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
 
     # Inference
-    # for img, target in data_module.val_dataloader():
-    for img, target in data_module.train_dataloader():
+    for img, target in data_module.val_dataloader():
+    # for img, target in data_module.train_dataloader():
         if torch.cuda.is_available:
             img = img.cuda()
         
@@ -73,10 +79,10 @@ def inference(cfg, ckpt):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         pred_img = get_tagged_img(img, pred_root_joints, pred_keypoints_joint)
-        # true_img = get_tagged_img(img, true_root_joints, true_keypoints_joint)
+        true_img = get_tagged_img(img, true_root_joints, true_keypoints_joint)
 
+        cv2.imshow('true', true_img)
         cv2.imshow('pred', pred_img)
-        # cv2.imshow('true', true_img)
         key = cv2.waitKey(0)
         if key == 27:
             break

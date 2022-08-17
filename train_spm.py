@@ -9,7 +9,8 @@ import torchsummary
 
 from dataset.mpii_keypoints_dataset import MPIIKeypointsDataModule
 from module.spm_module import SPMDetector
-from models.detector.spm import PoseNet
+from models.detector.spm import PoseNet, SPM
+from models.backbone.darknet import darknet19
 from utils.utility import make_model_name
 from utils.yaml_helper import get_configs
 
@@ -27,10 +28,15 @@ def train(cfg):
         batch_size = cfg['batch_size'],
     )
 
-    model = PoseNet(
-        nstack=cfg['nstack'], 
-        inp_dim=cfg['inp_dim'], 
-        oup_dim=cfg['oup_dim']
+    # model = PoseNet(
+    #     nstack=cfg['nstack'], 
+    #     inp_dim=cfg['inp_dim'], 
+    #     oup_dim=cfg['oup_dim']
+    # )
+    
+    model = SPM(
+        backbone=darknet19(), 
+        num_keypoints=cfg['num_keypoints']
     )
     
     torchsummary.summary(model, (cfg['in_channels'], cfg['input_size'], cfg['input_size']), batch_size=1, device='cpu')
@@ -47,11 +53,12 @@ def train(cfg):
             save_last=True,
             every_n_epochs=cfg['save_freq']
         ),
-        # EarlyStopping(
-        #     monitor='val_loss',
-        #     patience=10,
-        #     verbose=True
-        # )
+        EarlyStopping(
+            monitor='val_loss',
+            # min_delta=0.00001,
+            patience=20,
+            verbose=True
+        )
     ]
 
     trainer = pl.Trainer(

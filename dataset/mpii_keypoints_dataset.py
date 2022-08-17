@@ -22,6 +22,7 @@ class MPIIKeypointsDataset(Dataset):
         self.img_dir = img_dir
         self.data_dict = self._get_data_dict(file_path)
         self.imgs = list(self.data_dict.keys())
+        # print(f'Dataset Num: {len(self.imgs)}')
 
         self.transforms = transforms
         self.heatmap_generator = heatmap_generator
@@ -171,14 +172,14 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
         
     def setup(self, stage=None):
         train_transforms = A.Compose([
-            A.ChannelShuffle(),
-            A.CLAHE(),
-            A.ColorJitter(
-                brightness=0.5,
-                contrast=0.2,
-                saturation=0.5,
-                hue=0.1
-            ),
+            # A.ChannelShuffle(),
+            # A.CLAHE(),
+            # A.ColorJitter(
+            #     brightness=0.5,
+            #     contrast=0.2,
+            #     saturation=0.5,
+            #     hue=0.1
+            # ),
             A.Resize(self.input_size, self.input_size),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy'))
@@ -234,8 +235,8 @@ if __name__ == '__main__':
 
     cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
     # cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
-    # cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
-    cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
+    cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
+    # cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
     cfg['img_dir'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
     cfg['class_labels'] = [
         'r_ankle', 
@@ -262,16 +263,28 @@ if __name__ == '__main__':
     cfg['num_keypoints'] = 16
     cfg['sigma'] = 2
     
-    data_module = MPIIKeypointsDataModule(cfg)
+    data_module = MPIIKeypointsDataModule(
+        train_path = cfg['train_path'],
+        val_path = cfg['val_path'],
+        img_dir = cfg['img_dir'],
+        input_size = cfg['input_size'],
+        output_size = cfg['output_size'],
+        num_keypoints = cfg['num_keypoints'],
+        sigma = cfg['sigma'],
+        workers = cfg['workers'],
+        batch_size = 1,
+    )
     data_module.prepare_data()
     data_module.setup()
 
     spm_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
 
-    for img, target in data_module.train_dataloader():
-    # for img, target in data_module.val_dataloader():
+    # for img, target in data_module.train_dataloader():
+    for img, target in data_module.val_dataloader():
         # print(type(img), img.size())
         # print(type(target), target.size())
+
+        # continue
         
         # convert img to opencv numpy array
         img = img[0].permute((1, 2, 0)).numpy()

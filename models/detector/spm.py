@@ -1,11 +1,13 @@
 import os
 import sys
+from turtle import forward
 sys.path.append(os.getcwd())
 
 import torch
 from torch import nn
 import torchsummary
 from models.layers.blocks import Conv, Hourglass, Pool, Residual
+from models.backbone.darknet import darknet19
 
 
 class UnFlatten(nn.Module):
@@ -62,15 +64,70 @@ class PoseNet(nn.Module):
                 x = x + self.merge_preds[i](preds) + self.merge_features[i](feature)
         return torch.stack(combined_hm_preds, 1)
 
+
+class SPM(nn.Module):
+    def __init__(self, backbone, num_keypoints):
+        super().__init__()
+        
+        self.backbone = backbone
+        self.num_keypoints = num_keypoints
+        
+        self.deconv_1 = nn.Sequential(
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU()
+        )
+        
+        self.deconv_2 = nn.Sequential(
+            nn.ConvTranspose2d(512, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU()
+        )
+        
+        self.deconv_3 = nn.Sequential(
+            nn.ConvTranspose2d(512, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU()
+        )
+        
+        self.spm_head = nn.Sequential(
+            # nn.Conv2d(512, 1 + 2*self.num_keypoints, 1, 1, bias=False)
+            nn.Conv2d(512, 1, 1, 1, bias=False)
+        )
+        
+        self.dropout = nn.Dropout2d(0.5)
+        
+    def forward(self, x):
+        # backbone forward
+        x = self.backbone.stem(x)
+        b1 = self.backbone.layer1(x)
+        b2 = self.backbone.layer2(b1)
+        b3 = self.backbone.layer3(b2)
+        b4 = self.backbone.layer4(b3)
+        b5 = self.backbone.layer5(b4)
+        
+        x = self.deconv_1(b5)
+        x = self.deconv_2(x)
+        x = self.deconv_3(x)
+        
+        x = self.dropout(x)
+        
+        x = self.spm_head(x)
+
+        return x
+
+
 if __name__ == '__main__':
     input_size = 512
     output_size = 256
 
     tmp_input = torch.randn((1, 3, input_size, input_size))
 
-    model = PoseNet(nstack=8, inp_dim=256, oup_dim=33)
+    # model = PoseNet(nstack=8, inp_dim=256, oup_dim=33)
+    
+    backbone = darknet19()
+    model = SPM(backbone, 16)
 
     torchsummary.summary(model, (3, input_size, input_size), batch_size=1, device='cpu')
 
-    pred = model(tmp_input)
-    print(pred.size())
+

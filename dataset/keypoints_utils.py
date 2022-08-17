@@ -222,8 +222,8 @@ def get_keypoints(root_joints, displacements):
     return torch.stack(keypoints_joint)
 
 
-class DecodeSPM(nn.Module):
-    '''Decode SPM predictions to center(root joints) & keypoints joint
+class DecodePoseNet(nn.Module):
+    '''Decode PoseNet predictions to center(root joints) & keypoints joint
     
     Arguments:
         input_size (Int): Image input size 
@@ -267,6 +267,56 @@ class DecodeSPM(nn.Module):
 
         return root_joints, keypoints_joint
 
+
+class DecodeSPM(nn.Module):
+    '''Decode SPM predictions to center(root joints) & keypoints joint
+    
+    Arguments:
+        input_size (Int): Image input size 
+        sigma (Int): 2D Gaussian Filter, size = 6*sigma + 3
+        conf_threshold (Float): root joint confidence threshold value
+        pred (Bool): True - for Predictions, False - for Targets
+        x (Tensor): Predictions: [batch, 1 + (2*num_keypoints), output_size, output_size] or 
+                    Targets: [batch, 1 + (2*num_keypoints), output_size, output_size]
+
+    Returns:
+        root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y], scaled input size
+        keypoints_joint (Tensor): keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y], scaled input size
+    '''
+    def __init__(self, input_size, sigma, conf_threshold, pred=True):
+        super().__init__()
+        self.input_size = input_size
+        self.dist_threshold = (6*sigma + 2) / 2
+        self.conf_threshold = conf_threshold
+        self.pred = pred
+
+    def forward(self, x):
+        assert x.size(0) == 1
+
+        output_size = x.size(-1)
+
+        if self.pred:
+            heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
+            # displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
+            displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
+        else:
+            heatmaps = x[0, 0:1, :, :] # [1, output_size, output_size]
+            displacements = x[0, 1:, :, :] # [(2*num_keypoints), output_size, output_size]
+            
+            # min_value = torch.min(displacements)
+            # max_value = torch.max(displacements)
+            # print(f'min: {min_value}, max: {max_value}')
+
+        root_joints = nms_heatmaps(heatmaps, self.conf_threshold, self.dist_threshold)
+
+        keypoints_joint = get_keypoints(root_joints, displacements)
+
+        # convert joints output_size scale to input_size scale
+        root_joints = root_joints * self.input_size / output_size
+        keypoints_joint = keypoints_joint * self.input_size / output_size
+
+        return root_joints, keypoints_joint
+    
 
 def get_tagged_img(img, root_joints, keypoints_joint):
     '''Return Tagged Image
