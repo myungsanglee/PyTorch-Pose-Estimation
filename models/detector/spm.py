@@ -79,20 +79,20 @@ class SPM(nn.Module):
         )
         
         self.deconv_2 = nn.Sequential(
-            nn.ConvTranspose2d(512, 512, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(512),
+            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(256),
             nn.ReLU()
         )
         
         self.deconv_3 = nn.Sequential(
-            nn.ConvTranspose2d(512, 512, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(512),
+            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(128),
             nn.ReLU()
         )
         
         self.spm_head = nn.Sequential(
-            # nn.Conv2d(512, 1 + 2*self.num_keypoints, 1, 1, bias=False)
-            nn.Conv2d(512, 1, 1, 1, bias=False)
+            nn.Conv2d(128, 1 + 2*self.num_keypoints, 1, 1, bias=False)
+            # nn.Conv2d(128, 1, 1, 1, bias=False)
         )
         
         self.dropout = nn.Dropout2d(0.5)

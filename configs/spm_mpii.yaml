@@ -28,7 +28,7 @@ class_labels : [
 ]
 
 # epochs: 365
-epochs: 1000
+epochs: 500
 
 # train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
 # val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
@@ -53,7 +53,7 @@ devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 # optimizer: 'adam'
 # optimizer_options:
-#   lr: 1e-4
+#   lr: 1e-3
 #   weight_decay: 5e-4
 
 # optimizer: 'radam'
@@ -63,22 +63,22 @@ devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 # optimizer: 'adamw'
 # optimizer_options:
-#   lr: 0
-#   weight_decay: 1e-5
+#   lr: 1e-3
+#   weight_decay: 5e-4
 
 # optimizer: 'rmsprop'
 # optimizer_options:
-#   lr: 1e-4
+#   lr: 1e-3
 #   momentum: 0.9
 #   weight_decay: 5e-4
-#   eps: 0.0316
-#   alpha: 0.9
+  # eps: 0.0316
+  # alpha: 0.9
 
 optimizer: 'sgd'
 optimizer_options:
   lr: 1e-3
   momentum: 0.9
-  weight_decay: 1e-4
+  weight_decay: 5e-4
   nesterov: True
 
 # scheduler: 'multi_step'
@@ -103,5 +103,5 @@ optimizer_options:
 scheduler: 'yolo_lr'
 scheduler_options:
   burn_in: 5
-  steps: [500, 800]
+  steps: [200, 400]
   scales: [0.1, 0.1]

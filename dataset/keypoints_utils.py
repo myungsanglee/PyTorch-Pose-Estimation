@@ -190,7 +190,9 @@ def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
             sorted_xx = tmp_xx
         else:
             break
-
+    
+    # print(f'Root Joints Confidence: {root_joints_confidence}')
+    
     return torch.stack(root_joints)
 
 
@@ -297,8 +299,8 @@ class DecodeSPM(nn.Module):
 
         if self.pred:
             heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
-            # displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
-            displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
+            displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
+            # displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
         else:
             heatmaps = x[0, 0:1, :, :] # [1, output_size, output_size]
             displacements = x[0, 1:, :, :] # [(2*num_keypoints), output_size, output_size]
@@ -331,15 +333,17 @@ def get_tagged_img(img, root_joints, keypoints_joint):
     '''
     tagged_img = img.copy()
 
-    # Draw Root joints
-    for x, y in root_joints:
-        x, y = int(x), int(y)
-        cv2.circle(tagged_img, (x, y), 3, (0, 0, 255), -1)
-
+    
     # Draw keypoints joint
     for joints in keypoints_joint:
         for x, y in joints:
             x, y = int(x), int(y)
             cv2.circle(tagged_img, (x, y), 3, (255, 0, 0), -1)
+
+    # Draw Root joints
+    for x, y in root_joints:
+        x, y = int(x), int(y)
+        cv2.circle(tagged_img, (x, y), 3, (0, 0, 255), -1)
+
 
     return tagged_img

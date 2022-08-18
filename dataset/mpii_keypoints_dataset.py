@@ -172,14 +172,13 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
         
     def setup(self, stage=None):
         train_transforms = A.Compose([
-            # A.ChannelShuffle(),
-            # A.CLAHE(),
-            # A.ColorJitter(
-            #     brightness=0.5,
-            #     contrast=0.2,
-            #     saturation=0.5,
-            #     hue=0.1
-            # ),
+            A.CLAHE(),
+            A.ColorJitter(
+                brightness=0.5,
+                contrast=0.2,
+                saturation=0.5,
+                hue=0.1
+            ),
             A.Resize(self.input_size, self.input_size),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy'))
@@ -233,10 +232,10 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
 if __name__ == '__main__':
     cfg = dict()
 
-    cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
-    # cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
-    cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
-    # cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
+    # cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
+    # cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
+    cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
+    cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
     cfg['img_dir'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
     cfg['class_labels'] = [
         'r_ankle', 
@@ -258,7 +257,7 @@ if __name__ == '__main__':
     ]
     cfg['workers'] = 0
     cfg['input_size'] = 512
-    cfg['output_size'] = 128
+    cfg['output_size'] = 64
     cfg['batch_size'] = 1
     cfg['num_keypoints'] = 16
     cfg['sigma'] = 2
@@ -279,8 +278,8 @@ if __name__ == '__main__':
 
     spm_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
 
-    # for img, target in data_module.train_dataloader():
-    for img, target in data_module.val_dataloader():
+    for img, target in data_module.train_dataloader():
+    # for img, target in data_module.val_dataloader():
         # print(type(img), img.size())
         # print(type(target), target.size())
 
@@ -305,6 +304,8 @@ if __name__ == '__main__':
             for x, y in joints:
                 x, y = int(x), int(y)
                 cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
+
+        # heatmaps = cv2.resize(heatmaps, (416, 416))
 
         cv2.imshow('image', img)
         cv2.imshow('heatmaps', heatmaps)
