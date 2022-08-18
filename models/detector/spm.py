@@ -90,9 +90,17 @@ class SPM(nn.Module):
             nn.ReLU()
         )
         
-        self.spm_head = nn.Sequential(
-            nn.Conv2d(128, 1 + 2*self.num_keypoints, 1, 1, bias=False)
-            # nn.Conv2d(128, 1, 1, 1, bias=False)
+        # self.spm_head = nn.Sequential(
+        #     nn.Conv2d(128, 1 + 2*self.num_keypoints, 1, 1, bias=False)
+        #     # nn.Conv2d(128, 1, 1, 1, bias=False)
+        # )
+        
+        self.root_head = nn.Sequential(
+            nn.Conv2d(128, 1, 1, 1, bias=False)
+        )
+        
+        self.disp_head = nn.Sequential(
+            nn.Conv2d(128, 2*self.num_keypoints, 1, 1, bias=False)
         )
         
         self.dropout = nn.Dropout2d(0.5)
@@ -112,9 +120,14 @@ class SPM(nn.Module):
         
         x = self.dropout(x)
         
-        x = self.spm_head(x)
+        # x = self.spm_head(x)
+        
+        root = self.root_head(x)
+        
+        disp = self.disp_head(x)
 
-        return x
+        # return x
+        return root, disp
 
 
 if __name__ == '__main__':
