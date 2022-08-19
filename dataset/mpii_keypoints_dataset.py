@@ -13,6 +13,7 @@ import pytorch_lightning as pl
 import albumentations as A
 
 from dataset.keypoints_utils import HeatmapGenerator, DisplacementGenerator, MaskGenerator, DecodeSPM
+from utils.yaml_helper import get_configs
 
 
 class MPIIKeypointsDataset(Dataset):
@@ -230,38 +231,8 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
 
 
 if __name__ == '__main__':
-    cfg = dict()
+    cfg = get_configs('./configs/spm_mpii.yaml')
 
-    # cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
-    # cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
-    cfg['train_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
-    cfg['val_path'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
-    cfg['img_dir'] = '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
-    cfg['class_labels'] = [
-        'r_ankle', 
-        'r_knee', 
-        'r_hip', 
-        'l_hip', 
-        'l_knee', 
-        'l_ankle', 
-        'pelvis', 
-        'thorax', 
-        'upper_neck', 
-        'head_top', 
-        'r_wrist', 
-        'r_elbow', 
-        'r_shoulder',
-        'l_shoulder', 
-        'l_elbow',
-        'l_wrist'
-    ]
-    cfg['workers'] = 0
-    cfg['input_size'] = 512
-    cfg['output_size'] = 64
-    cfg['batch_size'] = 1
-    cfg['num_keypoints'] = 16
-    cfg['sigma'] = 2
-    
     data_module = MPIIKeypointsDataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],

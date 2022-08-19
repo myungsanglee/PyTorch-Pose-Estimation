@@ -53,7 +53,7 @@ def inference(cfg, ckpt):
     )
     model_module.eval()
 
-    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.5, True)
+    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.3, True)
     true_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
 
     # Inference

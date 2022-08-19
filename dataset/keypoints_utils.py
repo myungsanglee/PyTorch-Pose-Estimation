@@ -299,8 +299,8 @@ class DecodeSPM(nn.Module):
 
         if self.pred:
             heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
-            displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
-            # displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
+            # displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
+            displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
         else:
             heatmaps = x[0, 0:1, :, :] # [1, output_size, output_size]
             displacements = x[0, 1:, :, :] # [(2*num_keypoints), output_size, output_size]

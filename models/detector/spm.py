@@ -79,14 +79,14 @@ class SPM(nn.Module):
         )
         
         self.deconv_2 = nn.Sequential(
-            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(256),
+            nn.ConvTranspose2d(512, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
             nn.ReLU()
         )
         
         self.deconv_3 = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(128),
+            nn.ConvTranspose2d(512, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
             nn.ReLU()
         )
         
@@ -96,11 +96,11 @@ class SPM(nn.Module):
         # )
         
         self.root_head = nn.Sequential(
-            nn.Conv2d(128, 1, 1, 1, bias=False)
+            nn.Conv2d(512, 1, 1, 1, bias=False)
         )
         
         self.disp_head = nn.Sequential(
-            nn.Conv2d(128, 2*self.num_keypoints, 1, 1, bias=False)
+            nn.Conv2d(512, 2*self.num_keypoints, 1, 1, bias=False)
         )
         
         self.dropout = nn.Dropout2d(0.5)
@@ -123,11 +123,14 @@ class SPM(nn.Module):
         # x = self.spm_head(x)
         
         root = self.root_head(x)
+
+        return root
         
         disp = self.disp_head(x)
+        
+        x = torch.cat((root, disp), dim=1)
 
-        # return x
-        return root, disp
+        return x
 
 
 if __name__ == '__main__':
@@ -143,4 +146,5 @@ if __name__ == '__main__':
 
     torchsummary.summary(model, (3, input_size, input_size), batch_size=1, device='cpu')
 
-
+    a = model(tmp_input)    
+    print(f'{a.size()}')
