@@ -131,6 +131,42 @@ class DisplacementGenerator:
         return disp
 
 
+class PoseHeatmapGenerator:
+    def __init__(self, output_res, num_joints, sigma=-1):
+        self.output_res_h, self.output_res_w = output_res
+        self.num_joints = num_joints
+        if sigma < 0:
+            sigma = self.output_res_h/64
+        self.sigma = sigma
+        size = 6*sigma + 3
+        x = np.arange(0, size, 1, float)
+        y = x[:, np.newaxis]
+        x0, y0 = 3*sigma + 1, 3*sigma + 1
+        self.g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+
+    def __call__(self, joints):
+        hms = np.zeros((self.num_joints, self.output_res_h, self.output_res_w), dtype=np.float32)
+        sigma = self.sigma
+        for idx, (x, y) in enumerate(joints):
+            if x < 0 or y < 0:
+                continue
+            
+            x, y = np.clip(int(x), 0, self.output_res_w - 1), np.clip(int(y), 0, self.output_res_h - 1)
+            
+            ul = int(np.round(x - 3 * sigma - 1)), int(np.round(y - 3 * sigma - 1))
+            br = int(np.round(x + 3 * sigma + 2)), int(np.round(y + 3 * sigma + 2))
+
+            c, d = max(0, -ul[0]), min(br[0], self.output_res_w) - ul[0]
+            a, b = max(0, -ul[1]), min(br[1], self.output_res_h) - ul[1]
+
+            cc, dd = max(0, ul[0]), min(br[0], self.output_res_w)
+            aa, bb = max(0, ul[1]), min(br[1], self.output_res_h)
+            
+            hms[idx, aa:bb, cc:dd] = np.maximum(hms[idx, aa:bb, cc:dd], self.g[a:b, c:d])
+            
+        return hms
+
+
 def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
     """NMS heatmaps of the SPM model
     
