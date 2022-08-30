@@ -354,6 +354,71 @@ class DecodeSPM(nn.Module):
         keypoints_joint = keypoints_joint * self.input_size / output_size
 
         return root_joints, keypoints_joint
+
+
+def nms_sbp(heatmaps, conf_threshold=0.8):
+    """NMS heatmaps of the Simple Baseline Pose-Estimation model
+    
+    Convert heatmaps to joints info
+
+    Arguments:
+        heatmaps (Tensor): heatmaps of the SBP model with shape  '(num_keypoints, output_size, output_size)'
+        conf_threshold (float): confidence threshold to remove heatmap
+
+    Returns:
+        Tensor: joints '[num_keypoints, 2]', specified as [x, y]
+    """
+    num_keypoints = heatmaps.size(0)
+    joints = torch.zeros((num_keypoints, 2)) - 1
+    
+    for idx in torch.arange(num_keypoints):
+        heatmap = heatmaps[idx]
+        yy, xx = torch.where(heatmap > conf_threshold)
+        if yy.size(0) == 0:
+            continue
+        
+        heatmap_confidence = heatmap[yy, xx]
+        argmax_index = torch.argmax(heatmap_confidence)
+
+        joints[idx] = torch.tensor([xx[argmax_index], yy[argmax_index]])
+
+    return joints
+
+
+class DecodeSBP(nn.Module):
+    '''Decode SBP predictions to joints
+    
+    Arguments:
+        input_size (Int): Image input size 
+        conf_threshold (Float): joint confidence threshold value
+        pred (Bool): True - for Predictions, False - for Targets
+        x (Tensor): [batch, num_keypoints, output_size, output_size]
+
+    Returns:
+        joints (Tensor): heatmap joints '[num_keypoints, 2]', specified as [x, y], scaled input size
+    '''
+    def __init__(self, input_size, conf_threshold, pred=True):
+        super().__init__()
+        self.input_size = input_size[-1]
+        self.conf_threshold = conf_threshold
+        self.pred = pred
+        
+    def forward(self, x):
+        assert x.size(0) == 1
+
+        output_size = x.size(-1)
+
+        if self.pred:
+            heatmaps = torch.sigmoid(x) # [batch, num_keypoints, output_size, output_size]
+        else:
+            heatmaps = x
+
+        joints = nms_sbp(heatmaps[0], self.conf_threshold) # [num_keypoints, 2]
+
+        # convert joints output_size scale to input_size scale
+        joints = joints * self.input_size / output_size
+
+        return joints
     
 
 def get_tagged_img(img, root_joints, keypoints_joint):
@@ -368,7 +433,6 @@ def get_tagged_img(img, root_joints, keypoints_joint):
         img (Numpy): Tagged Image Array of Numpy or OpenCV 
     '''
     tagged_img = img.copy()
-
     
     # Draw keypoints joint
     for joints in keypoints_joint:
@@ -381,5 +445,27 @@ def get_tagged_img(img, root_joints, keypoints_joint):
         x, y = int(x), int(y)
         cv2.circle(tagged_img, (x, y), 3, (0, 0, 255), -1)
 
+
+    return tagged_img
+
+
+def get_tagged_img_sbp(img, joints):
+    '''Return Tagged Image
+    
+    Arguments:
+        img (Numpy): Image Array of Numpy or OpenCV 
+        joints (Tensor): joints '[num_keypoints, 2]', specified as [x, y], scaled input size
+    
+    Returns:
+        img (Numpy): Tagged Image Array of Numpy or OpenCV 
+    '''
+    tagged_img = img.copy()
+    
+    # Draw keypoints joint
+    for (x, y) in joints:
+        if x < 0 or y < 0:
+            continue
+        x, y = int(x), int(y)
+        cv2.circle(tagged_img, (x, y), 3, (255, 0, 0), -1)
 
     return tagged_img

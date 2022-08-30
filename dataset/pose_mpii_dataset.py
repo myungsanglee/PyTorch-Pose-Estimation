@@ -1,6 +1,5 @@
 import sys
 import os
-from tkinter import image_names
 sys.path.append(os.getcwd())
 from glob import glob
 import json
@@ -12,7 +11,7 @@ import numpy as np
 import pytorch_lightning as pl
 import albumentations as A
 
-from dataset.keypoints_utils import PoseHeatmapGenerator
+from dataset.keypoints_utils import PoseHeatmapGenerator, DecodeSBP
 from utils.yaml_helper import get_configs
 
 
@@ -21,7 +20,8 @@ class SBPDataset(Dataset):
         super().__init__()
 
         self.img_dir = img_dir
-        self.data = self._get_data_dict(file_path)
+        with open(file_path, 'r') as f:
+            self.data = json.load(f)
         self.transforms = transforms
         self.heatmap_generator = heatmap_generator
         self.ratio = ratio # output_size / input_size
@@ -77,8 +77,6 @@ class SBPDataset(Dataset):
         # convert image [height, width, channel] to [channel, height, width]
         transformed_img = np.transpose(transformed_img, (2, 0, 1))
 
-        # return transformed_img, transformed_keypoints
-
         # convert 'keypoints coordinates' input_size ratio to ouput_size ratio
         keypoints = transformed_keypoints * self.ratio
         keypoints[np.where(joints_vis < 1)[0], :] = -1
@@ -86,15 +84,7 @@ class SBPDataset(Dataset):
         # get heatmaps of root joints
         heatmaps = self.heatmap_generator(keypoints)
 
-        return transformed_img, (transformed_keypoints, heatmaps)
-
-    def _get_data_dict(self, files_path):
-        # data_dict = dict()
-        # dst = []
-        with open(files_path, 'r') as f:
-            data = json.load(f)
-
-        return data
+        return transformed_img, heatmaps
     
     def _check_joints(self, joints_vis, joints, img_size):
         w, h = img_size
@@ -117,6 +107,7 @@ class SBPDataset(Dataset):
                 tmp_joints_vis.append(0)
 
         return np.array(tmp_joints_vis), np.array(tmp_joints)
+
 
 class SBPDataModule(pl.LightningDataModule):
     def __init__(
@@ -157,7 +148,7 @@ class SBPDataModule(pl.LightningDataModule):
             A.Resize(self.input_size[0], self.input_size[1]),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy'))
-
+        
         valid_transform = A.Compose([
             A.Resize(self.input_size[0], self.input_size[1]),
             A.Normalize(0, 1)
@@ -217,40 +208,41 @@ if __name__ == '__main__':
     data_module.prepare_data()
     data_module.setup()
 
-    # spm_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
+    sbp_decoder = DecodeSBP(cfg['input_size'], 0.99, False)
 
-    # for img, target in data_module.train_dataloader():
-    for img, target in data_module.val_dataloader():        
+    for img, target in data_module.train_dataloader():
+    # for img, target in data_module.val_dataloader():        
         # convert img to opencv numpy array
         img = img[0].permute((1, 2, 0)).numpy()
         img = (img * 255).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         
-        joints, heatmaps = target
+        heatmaps = target
+        print(heatmaps.size())
+        masks = torch.where(heatmaps > 0., 1., 0.).type(torch.float32)
+        print(masks.size())
         
-        # print(joints.size())
-        # print(heatmaps.size())
+        joints = sbp_decoder(heatmaps)
+        
+        # Draw keypoints joint
+        for (x, y) in joints:
+            if x < 0 or y < 0:
+                continue
+            x, y = int(x), int(y)
+            cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
         
         heatmaps = heatmaps[0].permute((1, 2, 0)).numpy()
-        heatmaps = np.sum(heatmaps, axis=-1)
-        heatmaps = cv2.resize(heatmaps, (192, 256))
+        # heatmaps = np.sum(heatmaps, axis=-1)
+        # heatmaps = cv2.resize(heatmaps, (192, 256))
         
-        masks = np.where(heatmaps > 0, 1., 0.).astype(np.float32)
+        masks = masks[0].permute((1, 2, 0)).numpy()
 
-        # Draw keypoints joint
-        for (x, y) in joints[0]:
-            if x > 0 and y > 0:
-                x, y = int(x), int(y)
-                cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
-            
-       
-        heatmaps = cv2.resize(heatmaps, (416, 416))
-        masks = cv2.resize(masks, (416, 416))
-        
+        # heatmaps = cv2.resize(heatmaps, (416, 416))
+        # masks = cv2.resize(masks, (416, 416))
 
         cv2.imshow('image', img)
-        cv2.imshow('heatmaps', heatmaps)
-        cv2.imshow('masks', masks)
+        cv2.imshow('heatmaps', heatmaps[..., 9])
+        cv2.imshow('masks', masks[..., 9])
         key = cv2.waitKey(0)
         if key == 27:
             break

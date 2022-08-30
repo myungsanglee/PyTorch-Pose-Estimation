@@ -27,7 +27,7 @@ class SPMLoss(nn.Module):
 
         Returns:
             loss (float): total loss values
-        """        
+        """
         batch_size = input.size(0)
         # [batch, 1 + (2*num_keypoints), output_size, output_size] to [batch, output_size, output_size, 1 + (2*num_keypoints)]
         prediction = input.permute(0, 2, 3, 1).contiguous()
