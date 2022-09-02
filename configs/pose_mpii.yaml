@@ -1,5 +1,5 @@
 model : 'simple-baselines-pose'
-dataset_name : 'tmp-mpii-keypoints'
+dataset_name : 'mpii-keypoints'
 input_size: [256, 192] # [height, width] 4:3 ratio
 output_size: [64, 48] # [height, width]
 in_channels: 3
@@ -24,18 +24,18 @@ class_labels : [
   'l_wrist'
 ]
 
-# epochs: 365
-epochs: 500
+epochs: 365
+# epochs: 500
 
-# train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
-# val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
+train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
+val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
 # train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
 # val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
-train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
-val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
+# train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
+# val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
 img_dir : '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
-workers: 0 # number of workers to generate data
-batch_size: 1
+workers: 32 # number of workers to generate data
+batch_size: 64
 
 save_dir : './saved' # dir for saving log, weights
 save_freq: 5
@@ -43,7 +43,7 @@ save_freq: 5
 trainer_options:
   check_val_every_n_epoch: 5
   num_sanity_val_steps: 0
-  log_every_n_steps: 2
+  # log_every_n_steps: 2
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
 devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
@@ -75,7 +75,7 @@ optimizer: 'sgd'
 optimizer_options:
   lr: 1e-3
   momentum: 0.9
-  weight_decay: 5e-4
+  weight_decay: 5e-3
   nesterov: True
 
 # scheduler: 'multi_step'
@@ -99,6 +99,12 @@ optimizer_options:
 
 scheduler: 'yolo_lr'
 scheduler_options:
-  burn_in: 5
-  steps: [200, 400]
-  scales: [0.1, 0.1]
+  burn_in: 1000
+  steps: [40000]
+  scales: [0.1]
+
+# scheduler: 'yolo_lr'
+# scheduler_options:
+#   burn_in: 5
+#   steps: [200, 400]
+#   scales: [0.1, 0.1]

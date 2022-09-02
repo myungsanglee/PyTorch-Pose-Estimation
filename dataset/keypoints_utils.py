@@ -460,12 +460,37 @@ def get_tagged_img_sbp(img, joints):
         img (Numpy): Tagged Image Array of Numpy or OpenCV 
     '''
     tagged_img = img.copy()
+    h, w, _ = tagged_img.shape
+    
+    class_colors = [
+        (0, 0, 255), # r_ankle
+        (0, 255, 0), # r_knee
+        (255, 0, 0), # r_hip
+        (255, 255, 0), # l_hip
+        (255, 0, 255), # l_knee
+        (0, 255, 255), # l_ankle
+        (255, 0, 153), # pelvis
+        (102, 102, 0), # thorax
+        (0, 0, 204), # upper_neck
+        (0, 0, 0), # head_top
+        (0, 0, 255), # r_wrist
+        (0, 255, 0), # r_elbow
+        (255, 0, 0), # r_shoulder
+        (255, 255, 0), # l_shoulder
+        (255, 0, 255), # l_elbow
+        (0, 255, 255) # l_wrist
+    ]
     
     # Draw keypoints joint
-    for (x, y) in joints:
+    for idx, (x, y) in enumerate(joints):
         if x < 0 or y < 0:
             continue
         x, y = int(x), int(y)
-        cv2.circle(tagged_img, (x, y), 3, (255, 0, 0), -1)
-
+        cv2.circle(tagged_img, (x, y), 3, (0, 255, 0), -1)
+        
+        margin = 10
+        org_x = np.clip(x, margin, w - margin)
+        org_y = np.clip(y, margin, h - margin)
+        cv2.putText(tagged_img, f'{idx}', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
+        
     return tagged_img
