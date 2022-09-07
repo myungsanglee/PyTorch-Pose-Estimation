@@ -26,6 +26,7 @@ def train(cfg):
         sigma = cfg['sigma'],
         workers = cfg['workers'],
         batch_size = cfg['batch_size'],
+        class_labels=cfg['class_labels']
     )
     
     model = SBP(

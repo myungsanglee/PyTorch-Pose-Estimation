@@ -16,7 +16,7 @@ from utils.yaml_helper import get_configs
 
 
 class SBPDataset(Dataset):
-    def __init__(self, img_dir, file_path, transforms, heatmap_generator, ratio):
+    def __init__(self, img_dir, file_path, transforms, heatmap_generator, ratio, class_labels):
         super().__init__()
 
         self.img_dir = img_dir
@@ -25,6 +25,7 @@ class SBPDataset(Dataset):
         self.transforms = transforms
         self.heatmap_generator = heatmap_generator
         self.ratio = ratio # output_size / input_size
+        self.class_labels = np.array(class_labels)
 
     def __len__(self):
         return len(self.data)
@@ -69,20 +70,24 @@ class SBPDataset(Dataset):
         # joints[np.where(joints_vis < 1)[0], :] = 0
 
         # # transform
-        transformed = self.transforms(image=cropped_img, keypoints=joints)
+        transformed = self.transforms(image=cropped_img, keypoints=joints, class_labels=self.class_labels)
 
         transformed_img = transformed['image']
         transformed_keypoints = np.array(transformed['keypoints'])
-
-        # convert image [height, width, channel] to [channel, height, width]
-        transformed_img = np.transpose(transformed_img, (2, 0, 1))
-
+        transformed_class_labels = np.array(transformed['class_labels'])
+        
+        if len(transformed_keypoints) < len(self.class_labels):
+            transformed_keypoints, joints_vis = self._fix_joints(transformed_keypoints, transformed_class_labels)
+        
         # convert 'keypoints coordinates' input_size ratio to ouput_size ratio
         keypoints = transformed_keypoints * self.ratio
         keypoints[np.where(joints_vis < 1)[0], :] = -1
 
         # get heatmaps of root joints
         heatmaps = self.heatmap_generator(keypoints)
+        
+        # convert image [height, width, channel] to [channel, height, width]
+        transformed_img = np.transpose(transformed_img, (2, 0, 1))
 
         return transformed_img, heatmaps
     
@@ -107,7 +112,24 @@ class SBPDataset(Dataset):
                 tmp_joints_vis.append(0)
 
         return np.array(tmp_joints_vis), np.array(tmp_joints)
+    
+    def _fix_joints(self, transformed_keypoints, transformed_class_labels):
+        tmp_transformed_keypoints = []
+        tmp_joints_vis = []
+        
+        if len(transformed_keypoints) == 0:
+            return np.repeat(np.zeros((1, 2)), len(self.class_labels), 0), np.zeros(len(self.class_labels))
+        
+        for class_label in self.class_labels:
+            idx = np.where(transformed_class_labels==class_label)[0]
+            if len(idx):
+                tmp_transformed_keypoints.append(transformed_keypoints[idx[0]])
+                tmp_joints_vis.append(1)
+            else:
+                tmp_transformed_keypoints.append([0, 0])
+                tmp_joints_vis.append(0)
 
+        return np.array(tmp_transformed_keypoints), np.array(tmp_joints_vis)
 
 class SBPDataModule(pl.LightningDataModule):
     def __init__(
@@ -120,7 +142,8 @@ class SBPDataModule(pl.LightningDataModule):
         num_keypoints,
         sigma,
         workers,
-        batch_size
+        batch_size,
+        class_labels
     ):
         super().__init__()
         self.train_path = train_path
@@ -135,9 +158,11 @@ class SBPDataModule(pl.LightningDataModule):
             output_size, self.num_keypoints, sigma
         )
         self.ratio = self.output_size[0] / self.input_size[0]
+        self.class_labels = class_labels
         
     def setup(self, stage=None):
         train_transforms = A.Compose([
+            A.Rotate(limit=40),
             A.CLAHE(),
             A.ColorJitter(
                 brightness=0.5,
@@ -145,21 +170,24 @@ class SBPDataModule(pl.LightningDataModule):
                 saturation=0.5,
                 hue=0.1
             ),
-            A.Resize(self.input_size[0], self.input_size[1]),
+            A.RandomResizedCrop(self.input_size[0], self.input_size[1], (0.3, 1)),
+            # A.Resize(self.input_size[0], self.input_size[1]),
             A.Normalize(0, 1)
-        ], keypoint_params=A.KeypointParams(format='xy'))
-        
+        ], keypoint_params=A.KeypointParams(format='xy', label_fields=['class_labels']))
+
         valid_transform = A.Compose([
+            # A.RandomResizedCrop(self.input_size[0], self.input_size[1], (1, 1)),
             A.Resize(self.input_size[0], self.input_size[1]),
             A.Normalize(0, 1)
-        ], keypoint_params=A.KeypointParams(format='xy'))
+        ], keypoint_params=A.KeypointParams(format='xy', label_fields=['class_labels']))
         
         self.train_dataset = SBPDataset(
             self.img_dir,
             self.train_path,
             train_transforms, 
             self.heatmap_generator,
-            self.ratio
+            self.ratio,
+            self.class_labels
         )
         
         self.valid_dataset = SBPDataset(
@@ -167,7 +195,8 @@ class SBPDataModule(pl.LightningDataModule):
             self.val_path,
             valid_transform, 
             self.heatmap_generator,
-            self.ratio
+            self.ratio,
+            self.class_labels
         )
 
     def train_dataloader(self):
@@ -204,6 +233,8 @@ if __name__ == '__main__':
         sigma = cfg['sigma'],
         workers = cfg['workers'],
         batch_size = 1,
+        # batch_size = cfg['batch_size'],
+        class_labels=cfg['class_labels']
     )
     data_module.prepare_data()
     data_module.setup()
@@ -218,31 +249,30 @@ if __name__ == '__main__':
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         
         heatmaps = target
-        print(heatmaps.size())
-        masks = torch.where(heatmaps > 0., 1., 0.).type(torch.float32)
-        print(masks.size())
+        # print(heatmaps.size())
+        # masks = torch.where(heatmaps > 0., 1., 0.).type(torch.float32)
+        # print(masks.size())
         
         joints = sbp_decoder(heatmaps)
         
         # Draw keypoints joint
-        for (x, y) in joints:
+        for idx, (x, y) in enumerate(joints):
             if x < 0 or y < 0:
                 continue
             x, y = int(x), int(y)
             cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
+            
+            margin = 10
+            org_x = np.clip(x, margin, cfg['input_size'][1] - margin)
+            org_y = np.clip(y, margin, cfg['input_size'][0] - margin)
+            cv2.putText(img, f'{idx}', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
         
         heatmaps = heatmaps[0].permute((1, 2, 0)).numpy()
-        # heatmaps = np.sum(heatmaps, axis=-1)
-        # heatmaps = cv2.resize(heatmaps, (192, 256))
-        
-        masks = masks[0].permute((1, 2, 0)).numpy()
-
-        # heatmaps = cv2.resize(heatmaps, (416, 416))
-        # masks = cv2.resize(masks, (416, 416))
+        heatmaps = np.sum(heatmaps, axis=-1)
+        heatmaps = cv2.resize(heatmaps, (192, 256))
 
         cv2.imshow('image', img)
-        cv2.imshow('heatmaps', heatmaps[..., 9])
-        cv2.imshow('masks', masks[..., 9])
+        cv2.imshow('heatmaps', heatmaps)
         key = cv2.waitKey(0)
         if key == 27:
             break

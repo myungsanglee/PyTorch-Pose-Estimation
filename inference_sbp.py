@@ -28,6 +28,7 @@ def inference(cfg, ckpt):
         sigma = cfg['sigma'],
         workers = cfg['workers'],
         batch_size = 1,
+        class_labels=cfg['class_labels']
     )
     data_module.prepare_data()
     data_module.setup()
@@ -47,7 +48,7 @@ def inference(cfg, ckpt):
     )
     model_module.eval()
 
-    pred_decoder = DecodeSBP(cfg['input_size'], 0.3, True)
+    pred_decoder = DecodeSBP(cfg['input_size'], 0.4, True)
     true_decoder = DecodeSBP(cfg['input_size'], 0.99, False)
 
     # Inference
