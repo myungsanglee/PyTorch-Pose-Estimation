@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 
 from utils.module_select import get_optimizer, get_scheduler
 from models.loss.sbp_loss import SBPLoss
+from dataset.keypoints_utils import MeanAveragePrecision
 
 
 class SBPDetector(pl.LightningModule):
@@ -10,6 +11,7 @@ class SBPDetector(pl.LightningModule):
         self.save_hyperparameters(ignore='model')
         self.model = model
         self.loss_fn = SBPLoss()
+        self.map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
 
     def forward(self, x):
         predictions = self.model(x)
@@ -19,28 +21,28 @@ class SBPDetector(pl.LightningModule):
         img, target = batch
         pred = self.model(img)
         
-        loss = self.loss_fn(pred, target)
+        loss = self.loss_fn(pred, target['heatmaps'])
 
         self.log('train_loss', loss, prog_bar=True, logger=True)
 
         return loss
 
-    # def on_validation_epoch_start(self):
-    #     self.map_metric.reset_states()
+    def on_validation_epoch_start(self):
+        self.map_metric.reset_states()
 
     def validation_step(self, batch, batch_idx):
         img, target = batch
         pred = self.model(img)
 
-        loss = self.loss_fn(pred, target)
+        loss = self.loss_fn(pred, target['heatmaps'])
 
         self.log('val_loss', loss, prog_bar=True, logger=True)
 
-        # self.map_metric.update_state(batch['annot'], pred)        
+        self.map_metric.update_state(target, pred)        
 
-    # def on_validation_epoch_end(self):
-    #     map = self.map_metric.result()
-    #     self.log('val_mAP', map, prog_bar=True, logger=True)
+    def on_validation_epoch_end(self):
+        map = self.map_metric.result()
+        self.log('val_mAP', map, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
         cfg = self.hparams.cfg

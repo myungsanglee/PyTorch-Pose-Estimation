@@ -2,11 +2,14 @@ import sys
 import os
 sys.path.append(os.getcwd())
 import math
+import json
 
 import torch
 from torch import nn
 import numpy as np
 import cv2
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 
 
 # def collater(data):
@@ -366,10 +369,10 @@ def nms_sbp(heatmaps, conf_threshold=0.8):
         conf_threshold (float): confidence threshold to remove heatmap
 
     Returns:
-        Tensor: joints '[num_keypoints, 2]', specified as [x, y]
+        Tensor: joints '[num_keypoints, 3]', specified as [x, y, confidence]
     """
     num_keypoints = heatmaps.size(0)
-    joints = torch.zeros((num_keypoints, 2)) - 1
+    joints = torch.zeros((num_keypoints, 3), device=heatmaps.device) - 1
     
     for idx in torch.arange(num_keypoints):
         heatmap = heatmaps[idx]
@@ -380,7 +383,7 @@ def nms_sbp(heatmaps, conf_threshold=0.8):
         heatmap_confidence = heatmap[yy, xx]
         argmax_index = torch.argmax(heatmap_confidence)
 
-        joints[idx] = torch.tensor([xx[argmax_index], yy[argmax_index]])
+        joints[idx] = torch.tensor([xx[argmax_index], yy[argmax_index], heatmap_confidence[argmax_index]])
 
     return joints
 
@@ -395,7 +398,7 @@ class DecodeSBP(nn.Module):
         x (Tensor): [batch, num_keypoints, output_size, output_size]
 
     Returns:
-        joints (Tensor): heatmap joints '[num_keypoints, 2]', specified as [x, y], scaled input size
+        joints (Tensor): heatmap joints '[num_keypoints, 3]', specified as [x, y, confidence], scaled input size
     '''
     def __init__(self, input_size, conf_threshold, pred=True):
         super().__init__()
@@ -413,13 +416,84 @@ class DecodeSBP(nn.Module):
         else:
             heatmaps = x
 
-        joints = nms_sbp(heatmaps[0], self.conf_threshold) # [num_keypoints, 2]
+        joints = nms_sbp(heatmaps[0], self.conf_threshold) # [num_keypoints, 3]
 
         # convert joints output_size scale to input_size scale
-        joints = joints * self.input_size / output_size
+        joints[..., :2] *= (self.input_size / output_size)
 
         return joints
+
+
+class MeanAveragePrecision:
+    def __init__(self, json_path, input_size, conf_threshold):
+        self._coco = COCO(json_path)
+        self._input_size = input_size
+        self._decoder = DecodeSBP(input_size, conf_threshold, True)
+        self._result = []
+
+    def reset_states(self):
+        self._result = []
+
+    def update_state(self, target, y_pred):
+        batch_size = y_pred.size(0)
+        bbox = target['bbox']
+        img_ids = target['image_id']
+        cat_ids = target['category_id']
+        
+        for idx in range(batch_size):
+            joints = self._decoder(y_pred[idx:idx+1]) # [num_keypoints, 3]
+            
+            # convert joints input_size scale to original image scale
+            joints[..., :1] *= (bbox[idx][2] / self._input_size[1])
+            joints[..., 1:2] *= (bbox[idx][3] / self._input_size[0])
+
+            # convert joints to original image coordinate
+            joints[..., :1] += bbox[idx][0]
+            joints[..., 1:2] += bbox[idx][1]
+            
+            tmp_joints = []
+            tmp_confs = []
+            for (x, y, conf) in joints:
+                if conf < 0:
+                    tmp_joints.extend([0, 0, 0])
+                    tmp_confs.append(0)
+                    continue
+                
+                tmp_joints.extend([float(x), float(y), 1])
+                tmp_confs.append(conf)
+            
+            self._result.append({
+                "image_id": int(img_ids[idx]),
+                "category_id": int(cat_ids[idx]),
+                "keypoints": tmp_joints,
+                "score": float(sum(tmp_confs) / joints.size(0))
+            })
+
+    def result(self):
+        results_json_path = os.path.join(os.getcwd(), 'results.json')
+        with open(results_json_path, "w") as f:
+            json.dump(self._result, f, indent=4)
+
+        img_ids = sorted(self._coco.getImgIds())
+        cat_ids = sorted(self._coco.getCatIds())
+        
+        # load detection JSON file from the disk
+        cocovalPrediction = self._coco.loadRes(results_json_path)
+        # initialize the COCOeval object by passing the coco object with
+        # ground truth annotations, coco object with detection results
+        cocoEval = COCOeval(self._coco, cocovalPrediction, "keypoints")
+        
+        # run evaluation for each image, accumulates per image results
+        # display the summary metrics of the evaluation
+        cocoEval.params.imgIds  = img_ids
+        cocoEval.params.catIds  = cat_ids
     
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()
+
+        return cocoEval.stats[1]
+
 
 def get_tagged_img(img, root_joints, keypoints_joint):
     '''Return Tagged Image
@@ -482,8 +556,8 @@ def get_tagged_img_sbp(img, joints):
     ]
     
     # Draw keypoints joint
-    for idx, (x, y) in enumerate(joints):
-        if x < 0 or y < 0:
+    for idx, (x, y, conf) in enumerate(joints):
+        if conf < 0:
             continue
         x, y = int(x), int(y)
         cv2.circle(tagged_img, (x, y), 3, (0, 255, 0), -1)
@@ -494,3 +568,12 @@ def get_tagged_img_sbp(img, joints):
         cv2.putText(tagged_img, f'{idx}', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
         
     return tagged_img
+
+
+
+if __name__ == '__main__':
+    from utils.yaml_helper import get_configs
+    cfg = get_configs('configs/pose_coco.yaml')
+    map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
+    
+    

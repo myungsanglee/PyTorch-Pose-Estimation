@@ -1,4 +1,7 @@
 model : 'simple-baselines-pose'
+backbone: 'darknet19'
+backbone_pretrained: '' # 'tiny-imagenet' or '' 
+# backbone_pretrained: 'tiny-imagenet' # 'tiny-imagenet' or '' 
 dataset_name : 'coco-keypoints'
 input_size: [256, 192] # [height, width] 4:3 ratio
 output_size: [64, 48] # [height, width]
@@ -24,18 +27,20 @@ class_labels : [
   'left_ankle',
   'right_ankle'
 ]
+conf_threshold: 0.25
 
 epochs: 365
 # epochs: 500
 
-# train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
-# val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
-# img_dir : '/home/fssv2/myungsang/datasets/coco_2017'
-train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_train2017.json'
-val_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
-img_dir : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints'
+train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
+val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
+img_dir : '/home/fssv2/myungsang/datasets/coco_2017'
+# train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_train2017.json'
+# train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
+# val_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
+# img_dir : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints'
 workers: 32 # number of workers to generate data
-batch_size: 64
+batch_size: 256
 
 save_dir : './saved' # dir for saving log, weights
 save_freq: 5
@@ -43,33 +48,10 @@ save_freq: 5
 trainer_options:
   check_val_every_n_epoch: 5
   num_sanity_val_steps: 0
-  # log_every_n_steps: 2
+  # log_every_n_steps: 5
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
-devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
-
-# optimizer: 'adam'
-# optimizer_options:
-#   lr: 1e-3
-#   weight_decay: 5e-4
-
-# optimizer: 'radam'
-# optimizer_options:
-#   lr: 1e-3
-#   weight_decay: 1e-5
-
-# optimizer: 'adamw'
-# optimizer_options:
-#   lr: 1e-3
-#   weight_decay: 5e-4
-
-# optimizer: 'rmsprop'
-# optimizer_options:
-#   lr: 1e-3
-#   momentum: 0.9
-#   weight_decay: 5e-4
-  # eps: 0.0316
-  # alpha: 0.9
+devices: [0] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 optimizer: 'sgd'
 optimizer_options:
@@ -77,6 +59,12 @@ optimizer_options:
   momentum: 0.9
   weight_decay: 5e-3
   nesterov: True
+
+scheduler: 'yolo_lr'
+scheduler_options:
+  burn_in: 2000
+  steps: [105000]
+  scales: [0.1]
 
 # scheduler: 'multi_step'
 # scheduler_options:
@@ -97,14 +85,7 @@ optimizer_options:
 #   T_up: 220
 #   gamma: 0.96
 
-scheduler: 'yolo_lr'
-scheduler_options:
-  burn_in: 1000
-  steps: [40000]
-  scales: [0.1]
-
-# scheduler: 'yolo_lr'
-# scheduler_options:
-#   burn_in: 5
-#   steps: [200, 400]
-#   scales: [0.1, 0.1]
+# experimental_options:
+#   os: 'windows' # add this option if an error about NCCL occurs in windows
+#   callbacks:
+#     - 'SWA'

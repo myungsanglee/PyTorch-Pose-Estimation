@@ -83,7 +83,9 @@ class COCOKeypointsDataset(Dataset):
         # convert image [height, width, channel] to [channel, height, width]
         transformed_img = np.transpose(transformed_img, (2, 0, 1))
 
-        return transformed_img, heatmaps
+        db_rec['heatmaps'] = heatmaps
+
+        return transformed_img, db_rec
 
     def _get_img_dir(self, img_dir, file_path):
         img_dir_name = os.path.splitext(file_path.split('_')[-1])[0]
@@ -162,7 +164,7 @@ class COCOKeypointsDataset(Dataset):
 
             rec.append({
                 'image_path': os.path.join(self.img_dir, file_name),
-                'bbox': obj['clean_bbox'],
+                'bbox': np.array(obj['clean_bbox'], dtype=np.float),
                 'joints': joints,
                 'joints_vis': joints_vis,
                 'image_id': img_id,
@@ -230,8 +232,8 @@ class COCOKeypointsDataModule(pl.LightningDataModule):
                 saturation=0.5,
                 hue=0.1
             ),
-            # A.RandomResizedCrop(self.input_size[0], self.input_size[1], (0.4, 1), (0.4, 1.6)),
-            A.Resize(self.input_size[0], self.input_size[1]),
+            A.RandomResizedCrop(self.input_size[0], self.input_size[1], (0.4, 1), (0.4, 1.6)),
+            # A.Resize(self.input_size[0], self.input_size[1]),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy', label_fields=['class_labels']))
 
@@ -282,6 +284,7 @@ class COCOKeypointsDataModule(pl.LightningDataModule):
 
 
 if __name__ == '__main__':
+    from dataset.keypoints_utils import MeanAveragePrecision
     cfg = get_configs('./configs/pose_coco.yaml')
 
     data_module = COCOKeypointsDataModule(
@@ -301,6 +304,9 @@ if __name__ == '__main__':
     data_module.setup()
 
     sbp_decoder = DecodeSBP(cfg['input_size'], 0.99, False)
+    
+    map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
+    map_metric.reset_states()
 
     # for img, target in data_module.train_dataloader():
     for img, target in data_module.val_dataloader():        
@@ -309,16 +315,17 @@ if __name__ == '__main__':
         img = (img * 255).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         
-        heatmaps = target
-        # print(heatmaps.size())
+        heatmaps = target['heatmaps']
         # masks = torch.where(heatmaps > 0., 1., 0.).type(torch.float32)
         # print(masks.size())
+        
+        map_metric.update_state(target, heatmaps)
         
         joints = sbp_decoder(heatmaps)
         
         # Draw keypoints joint
-        for idx, (x, y) in enumerate(joints):
-            if x < 0 or y < 0:
+        for idx, (x, y, conf) in enumerate(joints):
+            if conf < 0:
                 continue
             x, y = int(x), int(y)
             cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
@@ -326,7 +333,7 @@ if __name__ == '__main__':
             margin = 10
             org_x = np.clip(x, margin, cfg['input_size'][1] - margin)
             org_y = np.clip(y, margin, cfg['input_size'][0] - margin)
-            cv2.putText(img, f'{idx}', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
+            cv2.putText(img, f'{idx}({conf:.2f})', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
         
         heatmaps = heatmaps[0].permute((1, 2, 0)).numpy()
         heatmaps = np.sum(heatmaps, axis=-1)
@@ -338,3 +345,6 @@ if __name__ == '__main__':
         if key == 27:
             break
     cv2.destroyAllWindows()
+
+    map = map_metric.result()
+    print(map)

@@ -7,16 +7,16 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, Ea
 from pytorch_lightning.plugins import DDPPlugin
 from torchinfo import summary
 
-from dataset.pose_mpii_dataset import SBPDataModule
+from dataset.coco_keypoints_dataset import COCOKeypointsDataModule
 from module.sbp_module import SBPDetector
 from models.detector.sbp import SBP
-from models.backbone.darknet import darknet19
+from utils.module_select import get_model
 from utils.utility import make_model_name
 from utils.yaml_helper import get_configs
 
 
 def train(cfg):
-    data_module = SBPDataModule(
+    data_module = COCOKeypointsDataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],
         img_dir = cfg['img_dir'],
@@ -29,8 +29,14 @@ def train(cfg):
         class_labels=cfg['class_labels']
     )
     
+    backbone_features_module = get_model(cfg['backbone'])(
+        pretrained=cfg['backbone_pretrained'], 
+        devices=cfg['devices'],
+        features_only=True
+    )
+    
     model = SBP(
-        backbone_module_list=darknet19(pretrained='').get_features_module_list(), 
+        backbone_features_module=backbone_features_module, 
         num_keypoints=cfg['num_keypoints']
     )
     
@@ -50,8 +56,7 @@ def train(cfg):
         ),
         EarlyStopping(
             monitor='val_loss',
-            # min_delta=0.00001,
-            patience=20,
+            patience=30,
             verbose=True
         )
     ]

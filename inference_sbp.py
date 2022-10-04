@@ -9,16 +9,16 @@ import cv2
 from utils.yaml_helper import get_configs
 from module.sbp_module import SBPDetector
 from models.detector.sbp import SBP
-from models.backbone.darknet import darknet19
+from utils.module_select import get_model
 from dataset.keypoints_utils import DecodeSBP, get_tagged_img_sbp
-from dataset.pose_mpii_dataset import SBPDataModule
+from dataset.coco_keypoints_dataset import COCOKeypointsDataModule
 
 
 def inference(cfg, ckpt):
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]= ','.join(str(num) for num in cfg['devices'])
 
-    data_module = SBPDataModule(
+    data_module = COCOKeypointsDataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],
         img_dir = cfg['img_dir'],
@@ -33,8 +33,14 @@ def inference(cfg, ckpt):
     data_module.prepare_data()
     data_module.setup()
     
+    backbone_features_module = get_model(cfg['backbone'])(
+        pretrained=cfg['backbone_pretrained'], 
+        devices=cfg['devices'],
+        features_only=True
+    )
+    
     model = SBP(
-        backbone_module_list=darknet19(pretrained='').get_features_module_list(), 
+        backbone_features_module=backbone_features_module, 
         num_keypoints=cfg['num_keypoints']
     )
 
@@ -63,7 +69,7 @@ def inference(cfg, ckpt):
         pred_joints = pred_decoder(predictions)
         print(f'Inference: {(time.time()-before)*1000:.2f}ms')
         
-        true_joints = true_decoder(target)
+        true_joints = true_decoder(target['heatmaps'])
 
         # batch_x to img
         if torch.cuda.is_available:
