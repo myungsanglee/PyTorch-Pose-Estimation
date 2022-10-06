@@ -54,7 +54,7 @@ def inference(cfg, ckpt):
     )
     model_module.eval()
 
-    pred_decoder = DecodeSBP(cfg['input_size'], 0.4, True)
+    pred_decoder = DecodeSBP(cfg['input_size'], cfg['conf_threshold'], True)
     true_decoder = DecodeSBP(cfg['input_size'], 0.99, False)
 
     # Inference
