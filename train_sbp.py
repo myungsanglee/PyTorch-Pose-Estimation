@@ -7,8 +7,8 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, Ea
 from pytorch_lightning.plugins import DDPPlugin
 from torchinfo import summary
 
-from dataset.coco_keypoints_dataset import COCOKeypointsDataModule
-from module.sbp_module import SBPDetector
+from dataset.sbp_coco_dataset import SBPCOCODataModule
+from module.sbp_detector import SBPDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
 from utils.utility import make_model_name
@@ -16,7 +16,7 @@ from utils.yaml_helper import get_configs
 
 
 def train(cfg):
-    data_module = COCOKeypointsDataModule(
+    data_module = SBPCOCODataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],
         img_dir = cfg['img_dir'],
@@ -60,7 +60,7 @@ def train(cfg):
             verbose=True
         )
     ]
-
+    
     trainer = pl.Trainer(
         max_epochs=cfg['epochs'],
         logger=TensorBoardLogger(cfg['save_dir'], make_model_name(cfg), default_hp_metric=False),

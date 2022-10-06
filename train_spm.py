@@ -8,7 +8,7 @@ from pytorch_lightning.plugins import DDPPlugin
 import torchsummary
 
 from dataset.mpii_keypoints_dataset import MPIIKeypointsDataModule
-from module.spm_module import SPMDetector
+from module.spm_detector import SPMDetector
 from models.detector.spm import PoseNet, SPM
 from models.backbone.darknet import darknet19
 from utils.utility import make_model_name

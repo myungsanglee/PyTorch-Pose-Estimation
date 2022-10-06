@@ -7,18 +7,18 @@ import numpy as np
 import cv2
 
 from utils.yaml_helper import get_configs
-from module.sbp_module import SBPDetector
+from module.sbp_detector import SBPDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
 from dataset.keypoints_utils import DecodeSBP, get_tagged_img_sbp
-from dataset.coco_keypoints_dataset import COCOKeypointsDataModule
+from dataset.sbp_coco_dataset import SBPCOCODataModule
 
 
 def inference(cfg, ckpt):
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]= ','.join(str(num) for num in cfg['devices'])
 
-    data_module = COCOKeypointsDataModule(
+    data_module = SBPCOCODataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],
         img_dir = cfg['img_dir'],

@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 
 from utils.yaml_helper import get_configs
-from module.spm_module import SPMDetector
+from module.spm_detector import SPMDetector
 from models.detector.spm import PoseNet, SPM
 from models.backbone.darknet import darknet19
 from dataset.keypoints_utils import DecodeSPM, get_tagged_img
