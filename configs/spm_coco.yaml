@@ -1,9 +1,9 @@
-model : 'simple-baselines-pose'
+model : 'spm'
 backbone: 'darknet19'
 backbone_pretrained: '' # 'tiny-imagenet' or '' 
 dataset_name : 'coco-keypoints'
-input_size: [256, 192] # [height, width] 4:3 ratio
-output_size: [64, 48] # [height, width]
+input_size: 512
+output_size: 128
 in_channels: 3
 num_keypoints : 17
 sigma: 2 # 2D Gaussian Filter, size = 6*sigma + 3
@@ -30,15 +30,15 @@ conf_threshold: 0.25
 
 epochs: 365
 
-train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
-val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
-img_dir : '/home/fssv2/myungsang/datasets/coco_2017'
+# train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
+# val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
+# img_dir : '/home/fssv2/myungsang/datasets/coco_2017'
 # train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_train2017.json'
-# train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
-# val_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
-# img_dir : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints'
-workers: 32 # number of workers to generate data
-batch_size: 256
+train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
+val_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
+img_dir : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints'
+workers: 0 # number of workers to generate data
+batch_size: 2
 
 save_dir : './saved' # dir for saving log, weights
 save_freq: 5
@@ -46,7 +46,7 @@ save_freq: 5
 trainer_options:
   check_val_every_n_epoch: 5
   num_sanity_val_steps: 0
-  # log_every_n_steps: 5
+  log_every_n_steps: 3
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
 devices: [0] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
@@ -60,8 +60,8 @@ optimizer_options:
 
 scheduler: 'yolo_lr'
 scheduler_options:
-  burn_in: 2000
-  steps: [105000]
+  burn_in: 20
+  steps: [600]
   scales: [0.1]
 
 # scheduler: 'multi_step'

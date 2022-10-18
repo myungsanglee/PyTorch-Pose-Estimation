@@ -5,18 +5,18 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
 from pytorch_lightning.plugins import DDPPlugin
-import torchsummary
+from torchinfo import summary
 
-from dataset.mpii_keypoints_dataset import MPIIKeypointsDataModule
+from dataset.spm_coco_dataset import SPMCOCODataModule
 from module.spm_detector import SPMDetector
-from models.detector.spm import PoseNet, SPM
-from models.backbone.darknet import darknet19
+from models.detector.spm import SPM
 from utils.utility import make_model_name
 from utils.yaml_helper import get_configs
+from utils.module_select import get_model
 
 
 def train(cfg):
-    data_module = MPIIKeypointsDataModule(
+    data_module = SPMCOCODataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],
         img_dir = cfg['img_dir'],
@@ -28,18 +28,18 @@ def train(cfg):
         batch_size = cfg['batch_size'],
     )
 
-    # model = PoseNet(
-    #     nstack=cfg['nstack'], 
-    #     inp_dim=cfg['inp_dim'], 
-    #     oup_dim=cfg['oup_dim']
-    # )
+    backbone_features_module = get_model(cfg['backbone'])(
+        pretrained=cfg['backbone_pretrained'],
+        devices=cfg['devices'],
+        features_only=True
+    )
     
     model = SPM(
-        backbone=darknet19(), 
+        backbone_features_module=backbone_features_module, 
         num_keypoints=cfg['num_keypoints']
     )
     
-    torchsummary.summary(model, (cfg['in_channels'], cfg['input_size'], cfg['input_size']), batch_size=1, device='cpu')
+    summary(model, input_size=(1, cfg['in_channels'], cfg['input_size'], cfg['input_size']), device='cpu')
 
     model_module = SPMDetector(
         model=model, 
@@ -55,7 +55,6 @@ def train(cfg):
         ),
         EarlyStopping(
             monitor='val_loss',
-            # min_delta=0.00001,
             patience=40,
             verbose=True
         )
@@ -66,7 +65,7 @@ def train(cfg):
         logger=TensorBoardLogger(cfg['save_dir'], make_model_name(cfg), default_hp_metric=False),
         accelerator=cfg['accelerator'],
         devices=cfg['devices'],
-        plugins=DDPPlugin(find_unused_parameters=True) if platform.system() != 'Windows' else None,
+        plugins=DDPPlugin(find_unused_parameters=False) if platform.system() != 'Windows' else None,
         callbacks=callbacks,
         **cfg['trainer_options']
     )

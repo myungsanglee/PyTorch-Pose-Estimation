@@ -5,7 +5,7 @@ sys.path.append(os.getcwd())
 
 import torch
 from torch import nn
-import torchsummary
+from torchinfo import summary
 from models.layers.blocks import Conv, Hourglass, Pool, Residual
 from models.backbone.darknet import darknet19
 
@@ -66,10 +66,10 @@ class PoseNet(nn.Module):
 
 
 class SPM(nn.Module):
-    def __init__(self, backbone, num_keypoints):
+    def __init__(self, backbone_features_module, num_keypoints):
         super().__init__()
         
-        self.backbone = backbone
+        self.backbone_features_module = backbone_features_module
         self.num_keypoints = num_keypoints
         
         self.deconv_1 = nn.Sequential(
@@ -103,28 +103,23 @@ class SPM(nn.Module):
             nn.Conv2d(512, 2*self.num_keypoints, 1, 1, bias=False)
         )
         
-        self.dropout = nn.Dropout2d(0.5)
+        # self.dropout = nn.Dropout2d(0.5)
         
     def forward(self, x):
         # backbone forward
-        x = self.backbone.stem(x)
-        b1 = self.backbone.layer1(x)
-        b2 = self.backbone.layer2(b1)
-        b3 = self.backbone.layer3(b2)
-        b4 = self.backbone.layer4(b3)
-        b5 = self.backbone.layer5(b4)
+        x = self.backbone_features_module(x)
         
-        x = self.deconv_1(b5)
+        x = self.deconv_1(x)
         x = self.deconv_2(x)
         x = self.deconv_3(x)
         
-        x = self.dropout(x)
+        # x = self.dropout(x)
         
         # x = self.spm_head(x)
         
         root = self.root_head(x)
 
-        return root
+        # return root
         
         disp = self.disp_head(x)
         
@@ -136,15 +131,17 @@ class SPM(nn.Module):
 if __name__ == '__main__':
     input_size = 512
     output_size = 256
+    num_keypoints = 17
 
     tmp_input = torch.randn((1, 3, input_size, input_size))
 
     # model = PoseNet(nstack=8, inp_dim=256, oup_dim=33)
     
-    backbone = darknet19()
-    model = SPM(backbone, 16)
+    backbone_features_module = darknet19(features_only=True)
+    model = SPM(backbone_features_module, num_keypoints)
 
-    torchsummary.summary(model, (3, input_size, input_size), batch_size=1, device='cpu')
+    summary(model, input_size=(1, 3, input_size, input_size), device='cpu')
 
     a = model(tmp_input)    
     print(f'{a.size()}')
+    

@@ -30,12 +30,12 @@ class_labels : [
 # epochs: 365
 epochs: 500
 
-# train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
-# val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
+train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/train.json'
+val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/valid.json'
 # train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_train.json'
 # val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp_valid.json'
-train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
-val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
+# train_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
+# val_path : '/home/fssv2/myungsang/datasets/mpii_human_pose/annotations/tmp.json'
 img_dir : '/home/fssv2/myungsang/datasets/mpii_human_pose/images'
 workers: 0 # number of workers to generate data
 batch_size: 1

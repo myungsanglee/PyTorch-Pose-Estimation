@@ -58,7 +58,7 @@ class MPIIKeypointsDataset(Dataset):
                     y = h -1
                 joint[idx] = [x, y]
             keypoints += joint
-
+    
         # transform
         transformed = self.transforms(image=img, keypoints=keypoints)
         # return transformed
@@ -71,7 +71,8 @@ class MPIIKeypointsDataset(Dataset):
 
         # parsing keypoints to joints & centers
         joints, centers = self._parsing_keypoints(transformed_keypoints)
-
+        print(np.array(joints).shape)
+        print(np.array(centers).shape)
         # get heatmaps of root joints
         heatmaps = self.heatmap_generator(centers)
 
@@ -180,7 +181,8 @@ class MPIIKeypointsDataModule(pl.LightningDataModule):
                 saturation=0.5,
                 hue=0.1
             ),
-            A.Resize(self.input_size, self.input_size),
+            A.RandomResizedCrop(self.input_size, self.input_size, (0.4, 1), (0.4, 1.6)),
+            # A.Resize(self.input_size, self.input_size),
             A.Normalize(0, 1)
         ], keypoint_params=A.KeypointParams(format='xy'))
 

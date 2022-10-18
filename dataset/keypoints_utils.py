@@ -3,6 +3,7 @@ import os
 sys.path.append(os.getcwd())
 import math
 import json
+import math
 
 import torch
 from torch import nn
@@ -64,13 +65,10 @@ class HeatmapGenerator:
         hms = np.zeros((self.num_joints, self.output_res, self.output_res), dtype=np.float32)
         sigma = self.sigma
         for p in joints:
-            for idx, pt in enumerate(p):
-                # if pt[2] > 0:
-                x, y = pt[0], pt[1]
-                if x < 0 or y < 0 or \
-                    x >= self.output_res or y >= self.output_res:
+            for idx, (x, y) in enumerate(p):
+                if x <= 0 and y <= 0:
                     continue
-
+                
                 ul = int(np.round(x - 3 * sigma - 1)), int(np.round(y - 3 * sigma - 1))
                 br = int(np.round(x + 3 * sigma + 2)), int(np.round(y + 3 * sigma + 2))
 
@@ -93,11 +91,9 @@ class MaskGenerator:
 
     def __call__(self, joints):
         mask = np.zeros((len(joints), self.output_res, self.output_res), dtype=np.float32)
-
         for i, joint in enumerate(joints):
-            for j, (x, y) in enumerate(joint):
-                if x < 0 or y < 0 or \
-                    x >= self.output_res or y >= self.output_res:
+            for (x, y) in joint:
+                if x <= 0 and y <= 0:
                     continue
                 
                 xmin = max(0, x - self.size)
@@ -124,8 +120,7 @@ class DisplacementGenerator:
         for i, joint in enumerate(joints):
             mask = masks[i]
             for j, (x, y) in enumerate(joint):
-                if x < 0 or y < 0 or \
-                    x >= self.output_res or y >= self.output_res:
+                if x <= 0 and y <= 0:
                     continue
                 
                 disp[(j*2)] += mask * (x - self.x_idx) / self.output_res
@@ -235,12 +230,13 @@ def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
     return torch.stack(root_joints)
 
 
-def get_keypoints(root_joints, displacements):
+def get_keypoints(root_joints, displacements, dist_threshold):
     """Get Body Joint Keypoints
 
     Arguments:
         root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y]
         displacements (Tensor): [(2*num_keypoints), output_size, output_size]
+        dist_threshold (float): distance threshold to remove Joint
 
     Returns:
         Tensor: keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y]
@@ -258,7 +254,16 @@ def get_keypoints(root_joints, displacements):
         for i in range(num_keypoints):
             keypoints_x = displacements[(2*i)][y, x] * output_size + x
             keypoints_y = displacements[(2*i + 1)][y, x] * output_size + y
-            tmp_keypoints.append(torch.stack([keypoints_x, keypoints_y]))
+            
+            # calculating distance
+            d = math.sqrt((x - keypoints_x)**2 + (y - keypoints_y)**2)
+            
+            if d < dist_threshold:
+                tmp_keypoints.append(torch.tensor([0, 0]))
+            else:
+                # keypoints_x = keypoints_x * output_size + x
+                # keypoints_y = keypoints_y * output_size + y
+                tmp_keypoints.append(torch.stack([keypoints_x, keypoints_y]))
         keypoints_joint.append(torch.stack(tmp_keypoints))
     return torch.stack(keypoints_joint)
 
@@ -291,7 +296,7 @@ class DecodePoseNet(nn.Module):
         output_size = x.size(-1)
 
         if self.pred:
-            x = torch.mean(x, dim=1) # [batch, nstack, 1 + (2*num_keypoints), output_size, output_size] to [batch, 1 + (2*num_keypoints), output_size, output_size]
+            # x = torch.mean(x, dim=1) # [batch, nstack, 1 + (2*num_keypoints), output_size, output_size] to [batch, 1 + (2*num_keypoints), output_size, output_size]
             heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
             displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
         else:
@@ -338,8 +343,8 @@ class DecodeSPM(nn.Module):
 
         if self.pred:
             heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
-            # displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
-            displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
+            displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
+            # displacements = torch.zeros((32, 128, 128)) # [(2*num_keypoints), output_size, output_size]
         else:
             heatmaps = x[0, 0:1, :, :] # [1, output_size, output_size]
             displacements = x[0, 1:, :, :] # [(2*num_keypoints), output_size, output_size]
@@ -350,7 +355,7 @@ class DecodeSPM(nn.Module):
 
         root_joints = nms_heatmaps(heatmaps, self.conf_threshold, self.dist_threshold)
 
-        keypoints_joint = get_keypoints(root_joints, displacements)
+        keypoints_joint = get_keypoints(root_joints, displacements, self.dist_threshold)
 
         # convert joints output_size scale to input_size scale
         root_joints = root_joints * self.input_size / output_size
@@ -511,6 +516,8 @@ def get_tagged_img(img, root_joints, keypoints_joint):
     # Draw keypoints joint
     for joints in keypoints_joint:
         for x, y in joints:
+            if x <= 0. and y <= 0.:
+                continue
             x, y = int(x), int(y)
             cv2.circle(tagged_img, (x, y), 3, (255, 0, 0), -1)
 

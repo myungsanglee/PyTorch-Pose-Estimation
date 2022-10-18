@@ -8,17 +8,17 @@ import cv2
 
 from utils.yaml_helper import get_configs
 from module.spm_detector import SPMDetector
-from models.detector.spm import PoseNet, SPM
-from models.backbone.darknet import darknet19
+from models.detector.spm import SPM
+from utils.module_select import get_model
 from dataset.keypoints_utils import DecodeSPM, get_tagged_img
-from dataset.mpii_keypoints_dataset import MPIIKeypointsDataModule
+from dataset.spm_coco_dataset import SPMCOCODataModule
 
 
 def inference(cfg, ckpt):
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]= ','.join(str(num) for num in cfg['devices'])
 
-    data_module = MPIIKeypointsDataModule(
+    data_module = SPMCOCODataModule(
         train_path = cfg['train_path'],
         val_path = cfg['val_path'],
         img_dir = cfg['img_dir'],
@@ -32,14 +32,14 @@ def inference(cfg, ckpt):
     data_module.prepare_data()
     data_module.setup()
     
-    # model = PoseNet(
-    #     nstack=cfg['nstack'], 
-    #     inp_dim=cfg['inp_dim'], 
-    #     oup_dim=cfg['oup_dim']
-    # )
+    backbone_features_module = get_model(cfg['backbone'])(
+        pretrained=cfg['backbone_pretrained'],
+        devices=cfg['devices'],
+        features_only=True
+    )
     
     model = SPM(
-        backbone=darknet19(), 
+        backbone_features_module=backbone_features_module, 
         num_keypoints=cfg['num_keypoints']
     )
 
@@ -53,7 +53,7 @@ def inference(cfg, ckpt):
     )
     model_module.eval()
 
-    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.3, True)
+    pred_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], cfg['conf_threshold'], True)
     true_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
 
     # Inference
