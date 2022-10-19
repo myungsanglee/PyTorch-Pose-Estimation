@@ -9,7 +9,6 @@ from torch import nn
 class SBPLoss(nn.Module):
     """Simple Baseline Pose-Estimation Loss Function
     """
-    
     def __init__(self):
         super().__init__()
         # weight factor to balance two kinds of losses
@@ -17,7 +16,6 @@ class SBPLoss(nn.Module):
         self.lambda_negative = 1
         
         self.mse_loss = nn.MSELoss(reduction='sum')
-        # self.mse_loss = nn.MSELoss(reduction='mean')
 
     def forward(self, input, target):
         """
@@ -32,6 +30,7 @@ class SBPLoss(nn.Module):
         # [batch, num_keypoints, output_size, output_size] to [batch, output_size, output_size, num_keypoints]
         prediction = input.permute(0, 2, 3, 1).contiguous()
         prediction = torch.sigmoid(prediction) 
+        num_keypoints = prediction.size(-1)
         
         mask, n_mask, true_heatmaps = self.encode_target(target)
         if prediction.is_cuda:
@@ -42,16 +41,11 @@ class SBPLoss(nn.Module):
         # ======================== #
         #   Joints Heatmap Loss   #
         # ======================== #
-        loss_positive = self.lambda_positive * self.mse_loss(prediction * mask, true_heatmaps) / (17 * 2)
-        loss_negative = self.lambda_negative * self.mse_loss(prediction * n_mask, true_heatmaps * n_mask) / (17 * 2) 
+        loss_positive = self.lambda_positive * self.mse_loss(prediction * mask, true_heatmaps) / (num_keypoints * 2)
+        loss_negative = self.lambda_negative * self.mse_loss(prediction * n_mask, true_heatmaps * n_mask) / (num_keypoints * 2) 
 
-        # loss = (loss_positive + loss_negative) * batch_size
         loss = (loss_positive + loss_negative) / batch_size
         
-        # loss_joints = self.mse_loss(prediction, true_heatmaps)
-
-        # loss = loss_joints * batch_size
-
         return loss
 
     def encode_target(self, target):

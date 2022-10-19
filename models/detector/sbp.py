@@ -36,8 +36,6 @@ class SBP(nn.Module):
             nn.Conv2d(512, self.num_keypoints, 1, 1, bias=False)
         )
         
-        # self.dropout = nn.Dropout2d(0.5)
-        
     def forward(self, x):
         # backbone forward
         x = self.backbone_features_module(x)
@@ -45,8 +43,6 @@ class SBP(nn.Module):
         x = self.deconv_1(x)
         x = self.deconv_2(x)
         x = self.deconv_3(x)
-        
-        # x = self.dropout(x)
         
         x = self.sbp_head(x)
 
@@ -56,10 +52,9 @@ class SBP(nn.Module):
 if __name__ == '__main__':
     input_size = [256, 192] # [height, width]
     output_size = [64, 48] # [height, width]
+    num_keypoints = 17
 
     backbone_features_module = darknet19(pretrained='', features_only=True)
-    model = SBP(backbone_features_module, 17)
+    model = SBP(backbone_features_module, num_keypoints)
 
     summary(model, (1, 3, input_size[0], input_size[1]), device='cpu')
-    
-    

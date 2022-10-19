@@ -1,21 +1,16 @@
-from macpath import join
 import sys
 import os
-sys.path.append(os.getcwd())
-from glob import glob
-import json
 import copy
+sys.path.append(os.getcwd())
 
-import torch
 from torch.utils.data import Dataset, DataLoader
 import cv2
 import numpy as np
 import pytorch_lightning as pl
 import albumentations as A
-import pycocotools
 from pycocotools.coco import COCO
 
-from dataset.keypoints_utils import PoseHeatmapGenerator, DecodeSBP
+from dataset.keypoints_utils import SBPHeatmapGenerator, DecodeSBP
 from utils.yaml_helper import get_configs
 
 
@@ -215,7 +210,7 @@ class SBPCOCODataModule(pl.LightningDataModule):
         self.output_size = output_size
         self.num_keypoints = num_keypoints
         self.batch_size = batch_size
-        self.heatmap_generator = PoseHeatmapGenerator(
+        self.heatmap_generator = SBPHeatmapGenerator(
             output_size, self.num_keypoints, sigma
         )
         self.ratio = self.output_size[0] / self.input_size[0]

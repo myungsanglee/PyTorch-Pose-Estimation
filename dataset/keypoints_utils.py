@@ -13,42 +13,11 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
 
-# def collater(data):
-#     """Data Loader에서 생성된 데이터를 동일한 shape으로 정렬해서 Batch로 전달
-
-#     Arguments::
-#         data (Dict): albumentation Transformed 객체
-#         'image': list of Torch Tensor len == batch_size, item shape = ch, h, w
-#         'bboxes': list of list([cx, cy, w, h, cid])
-
-#     Returns:
-#         Dict: 정렬된 batch data.
-#         'img': image tensor, [batch_size, channel, height, width] shape
-#         'annot': 동일 shape으로 정렬된 tensor, [batch_size, max_num_annots, 5(cx, cy, w, h, cid)] shape
-#     """
-#     imgs = [s['image'] for s in data]
-#     bboxes = [torch.tensor(s['bboxes'])for s in data]
-#     batch_size = len(imgs)
-
-#     max_num_annots = max(annots.shape[0] for annots in bboxes)
-
-#     if max_num_annots > 0:
-#         padded_annots = torch.ones((batch_size, max_num_annots, 5)) * -1
-#         for idx, annot in enumerate(bboxes):
-#             if annot.shape[0] > 0:
-#                 padded_annots[idx, :annot.shape[0], :] = annot
-                
-#     else:
-#         padded_annots = torch.ones((batch_size, 1, 5)) * -1
-
-#     return {'img': torch.stack(imgs), 'annot': padded_annots}
-
-
 '''
 https://github.com/HRNet/HigherHRNet-Human-Pose-Estimation/blob/master/lib/dataset/target_generators/target_generators.py
 참고
 '''
-class HeatmapGenerator:
+class SPMHeatmapGenerator:
     def __init__(self, output_res, num_joints, sigma=-1):
         self.output_res = output_res
         self.num_joints = num_joints
@@ -82,7 +51,7 @@ class HeatmapGenerator:
         return hms
 
 
-class MaskGenerator:
+class SPMMaskGenerator:
     def __init__(self, output_res, sigma=-1):
         self.output_res = output_res
         if sigma < 0:
@@ -106,7 +75,7 @@ class MaskGenerator:
         return mask
 
 
-class DisplacementGenerator:
+class SPMDisplacementGenerator:
     def __init__(self, output_res, num_joints):
         self.output_res = output_res
         self.num_joints = num_joints
@@ -114,6 +83,7 @@ class DisplacementGenerator:
         y_idx = x_idx.transpose(0, 1)
         self.x_idx = x_idx.numpy()
         self.y_idx = y_idx.numpy()
+        self.z = math.sqrt(output_res**2 + output_res**2)
 
     def __call__(self, joints, masks):
         disp = np.zeros((self.num_joints*2, self.output_res, self.output_res), dtype=np.float32)
@@ -123,13 +93,13 @@ class DisplacementGenerator:
                 if x <= 0 and y <= 0:
                     continue
                 
-                disp[(j*2)] += mask * (x - self.x_idx) / self.output_res
-                disp[(j*2) + 1] += mask * (y - self.y_idx) / self.output_res
+                disp[(j*2)] += mask * (x - self.x_idx) / self.z
+                disp[(j*2) + 1] += mask * (y - self.y_idx) / self.z
                 
         return disp
 
 
-class PoseHeatmapGenerator:
+class SBPHeatmapGenerator:
     def __init__(self, output_res, num_joints, sigma=-1):
         self.output_res_h, self.output_res_w = output_res
         self.num_joints = num_joints
@@ -165,7 +135,7 @@ class PoseHeatmapGenerator:
         return hms
 
 
-def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
+def nms_spm(heatmaps, conf_threshold=0.8, dist_threshold=7.):
     """NMS heatmaps of the SPM model
     
     Convert heatmaps to root joints info
@@ -230,7 +200,7 @@ def nms_heatmaps(heatmaps, conf_threshold=0.8, dist_threshold=7.):
     return torch.stack(root_joints)
 
 
-def get_keypoints(root_joints, displacements, dist_threshold):
+def get_spm_keypoints(root_joints, displacements, dist_threshold):
     """Get Body Joint Keypoints
 
     Arguments:
@@ -243,6 +213,8 @@ def get_keypoints(root_joints, displacements, dist_threshold):
     """
     num_keypoints, output_size, _ = displacements.size()
     num_keypoints = int(num_keypoints / 2)
+    z = math.sqrt(output_size**2 + output_size**2)
+    device = displacements.device
     
     if root_joints.size(0) == 0:
         return root_joints
@@ -252,66 +224,20 @@ def get_keypoints(root_joints, displacements, dist_threshold):
         x, y = root_joint
         tmp_keypoints = []
         for i in range(num_keypoints):
-            keypoints_x = displacements[(2*i)][y, x] * output_size + x
-            keypoints_y = displacements[(2*i + 1)][y, x] * output_size + y
+            keypoints_x = displacements[(2*i)][y, x] * z + x
+            keypoints_y = displacements[(2*i + 1)][y, x] * z + y
             
             # calculating distance
             d = math.sqrt((x - keypoints_x)**2 + (y - keypoints_y)**2)
             
             if d < dist_threshold:
-                tmp_keypoints.append(torch.tensor([0, 0]))
+                tmp_keypoints.append(torch.tensor([0, 0], device=device))
             else:
                 # keypoints_x = keypoints_x * output_size + x
                 # keypoints_y = keypoints_y * output_size + y
                 tmp_keypoints.append(torch.stack([keypoints_x, keypoints_y]))
         keypoints_joint.append(torch.stack(tmp_keypoints))
     return torch.stack(keypoints_joint)
-
-
-class DecodePoseNet(nn.Module):
-    '''Decode PoseNet predictions to center(root joints) & keypoints joint
-    
-    Arguments:
-        input_size (Int): Image input size 
-        sigma (Int): 2D Gaussian Filter, size = 6*sigma + 3
-        conf_threshold (Float): root joint confidence threshold value
-        pred (Bool): True - for Predictions, False - for Targets
-        x (Tensor): Predictions: [batch, nstack, 1 + (2*num_keypoints), output_size, output_size] or 
-                    Targets: [batch, 1 + (2*num_keypoints), output_size, output_size]
-
-    Returns:
-        root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y], scaled input size
-        keypoints_joint (Tensor): keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y], scaled input size
-    '''
-    def __init__(self, input_size, sigma, conf_threshold, pred=True):
-        super().__init__()
-        self.input_size = input_size
-        self.dist_threshold = (6*sigma + 2) / 2
-        self.conf_threshold = conf_threshold
-        self.pred = pred
-
-    def forward(self, x):
-        assert x.size(0) == 1
-
-        output_size = x.size(-1)
-
-        if self.pred:
-            # x = torch.mean(x, dim=1) # [batch, nstack, 1 + (2*num_keypoints), output_size, output_size] to [batch, 1 + (2*num_keypoints), output_size, output_size]
-            heatmaps = torch.sigmoid(x[0, 0:1, :, :])# [1, output_size, output_size]
-            displacements = torch.tanh(x[0, 1:, :, :]) # [(2*num_keypoints), output_size, output_size]
-        else:
-            heatmaps = x[0, 0:1, :, :] # [1, output_size, output_size]
-            displacements = x[0, 1:, :, :] # [(2*num_keypoints), output_size, output_size]
-
-        root_joints = nms_heatmaps(heatmaps, self.conf_threshold, self.dist_threshold)
-
-        keypoints_joint = get_keypoints(root_joints, displacements)
-
-        # convert joints output_size scale to input_size scale
-        root_joints = root_joints * self.input_size / output_size
-        keypoints_joint = keypoints_joint * self.input_size / output_size
-
-        return root_joints, keypoints_joint
 
 
 class DecodeSPM(nn.Module):
@@ -353,9 +279,9 @@ class DecodeSPM(nn.Module):
             # max_value = torch.max(displacements)
             # print(f'min: {min_value}, max: {max_value}')
 
-        root_joints = nms_heatmaps(heatmaps, self.conf_threshold, self.dist_threshold)
+        root_joints = nms_spm(heatmaps, self.conf_threshold, self.dist_threshold)
 
-        keypoints_joint = get_keypoints(root_joints, displacements, self.dist_threshold)
+        keypoints_joint = get_spm_keypoints(root_joints, displacements, self.dist_threshold)
 
         # convert joints output_size scale to input_size scale
         root_joints = root_joints * self.input_size / output_size
@@ -500,7 +426,7 @@ class MeanAveragePrecision:
         return cocoEval.stats[1]
 
 
-def get_tagged_img(img, root_joints, keypoints_joint):
+def get_tagged_img_spm(img, root_joints, keypoints_joint):
     '''Return Tagged Image
     
     Arguments:
@@ -575,12 +501,3 @@ def get_tagged_img_sbp(img, joints):
         cv2.putText(tagged_img, f'{idx}', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
         
     return tagged_img
-
-
-
-if __name__ == '__main__':
-    from utils.yaml_helper import get_configs
-    cfg = get_configs('configs/pose_coco.yaml')
-    map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
-    
-    

@@ -1,22 +1,16 @@
-from macpath import join
-from symbol import continue_stmt
 import sys
 import os
-sys.path.append(os.getcwd())
-from glob import glob
-import json
 import copy
+sys.path.append(os.getcwd())
 
-import torch
 from torch.utils.data import Dataset, DataLoader
 import cv2
 import numpy as np
 import pytorch_lightning as pl
 import albumentations as A
-import pycocotools
 from pycocotools.coco import COCO
 
-from dataset.keypoints_utils import HeatmapGenerator, DisplacementGenerator, MaskGenerator, DecodeSPM
+from dataset.keypoints_utils import SPMHeatmapGenerator, SPMDisplacementGenerator, SPMMaskGenerator, DecodeSPM
 from utils.yaml_helper import get_configs
 
 
@@ -55,10 +49,10 @@ class SPMCOCODataset(Dataset):
         centers = db_rec['centers'] # (num_person, 2)
         
         # concat joints & centers
-        keypoints = np.concatenate([joints, np.reshape(centers, (-1, 1, 2))], axis=1) # (num_person * (num_keypoints + 1), 2)
+        keypoints = np.concatenate([joints, np.reshape(centers, (-1, 1, 2))], axis=1) # (num_person, (num_keypoints + 1), 2)
         
         # convert keypoints shape to (-1, 2)
-        keypoints = np.reshape(keypoints, (-1, 2))
+        keypoints = np.reshape(keypoints, (-1, 2)) # (num_person * (num_keypoints + 1), 2)
         
         # transform
         transformed = self.transforms(image=img, keypoints=keypoints)
@@ -176,14 +170,15 @@ class SPMCOCODataset(Dataset):
             tmp_joints_vis.append(joints_vis)
             tmp_centers.append([cx, cy])
 
-        rec.append({
-            'image_path': os.path.join(self.img_dir, file_name),
-            'joints': np.array(tmp_joints),
-            'joints_vis': np.array(tmp_joints_vis),
-            'centers': np.array(tmp_centers),
-            'image_id': img_id,
-            'category_id': obj['category_id'],
-        })
+        if tmp_joints:
+            rec.append({
+                'image_path': os.path.join(self.img_dir, file_name),
+                'joints': np.array(tmp_joints),
+                'joints_vis': np.array(tmp_joints_vis),
+                'centers': np.array(tmp_centers),
+                'image_id': img_id,
+                'category_id': obj['category_id'],
+            })
 
         return rec
 
@@ -211,13 +206,13 @@ class SPMCOCODataModule(pl.LightningDataModule):
         self.output_size = output_size
         self.num_keypoints = num_keypoints
         self.batch_size = batch_size
-        self.heatmap_generator = HeatmapGenerator(
+        self.heatmap_generator = SPMHeatmapGenerator(
             output_size, 1, sigma
         )
-        self.displacement_generator = DisplacementGenerator(
+        self.displacement_generator = SPMDisplacementGenerator(
             output_size, num_keypoints
         )
-        self.mask_generator = MaskGenerator(
+        self.mask_generator = SPMMaskGenerator(
             output_size, sigma
         )
         self.ratio = self.output_size / self.input_size
@@ -315,8 +310,8 @@ if __name__ == '__main__':
     # map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
     # map_metric.reset_states()
 
-    for img, target in data_module.train_dataloader():
-    # for img, target in data_module.val_dataloader():        
+    # for img, target in data_module.train_dataloader():
+    for img, target in data_module.val_dataloader():        
         # convert img to opencv numpy array
         img = img[0].permute((1, 2, 0)).numpy()
         img = (img * 255).astype(np.uint8)

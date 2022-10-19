@@ -10,7 +10,7 @@ from utils.yaml_helper import get_configs
 from module.spm_detector import SPMDetector
 from models.detector.spm import SPM
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSPM, get_tagged_img
+from dataset.keypoints_utils import DecodeSPM, get_tagged_img_spm
 from dataset.spm_coco_dataset import SPMCOCODataModule
 
 
@@ -78,8 +78,8 @@ def inference(cfg, ckpt):
         img = (np.transpose(img, (1, 2, 0))*255.).astype(np.uint8).copy()
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-        pred_img = get_tagged_img(img, pred_root_joints, pred_keypoints_joint)
-        true_img = get_tagged_img(img, true_root_joints, true_keypoints_joint)
+        pred_img = get_tagged_img_spm(img, pred_root_joints, pred_keypoints_joint)
+        true_img = get_tagged_img_spm(img, true_root_joints, true_keypoints_joint)
 
         cv2.imshow('true', true_img)
         cv2.imshow('pred', pred_img)

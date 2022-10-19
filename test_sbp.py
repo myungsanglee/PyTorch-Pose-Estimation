@@ -2,8 +2,6 @@ import argparse
 import platform
 
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
 from pytorch_lightning.plugins import DDPPlugin
 from torchinfo import summary
 
@@ -11,7 +9,6 @@ from dataset.sbp_coco_dataset import SBPCOCODataModule
 from module.sbp_detector import SBPDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
-from utils.utility import make_model_name
 from utils.yaml_helper import get_configs
 
 def test(cfg, ckpt):
