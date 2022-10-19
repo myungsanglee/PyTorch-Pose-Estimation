@@ -30,12 +30,20 @@ python test_sbp.py --cfg configs/sbp_coco.yaml
 python inference_sbp.py --cfg configs/sbp_coco.yaml --ckpt path/to/ckpt_file
 ```
 
-## 데이터셋
+## Training Experiments
+### 개요
+- Pose Estimation 모델 훈련
+- Pretrained Weights 사용하지 않고 처음부터 훈련
+
+### 데이터셋
 | Train Dataset | Validation Dataset |
 | --- | --- |
 | COCO2017 Train | COCO2017 Validation |
 
-## 결과
+### 결과
+- Validation Dataset 결과
+- Confidence Threshold = 0.25
+
 | Method | Backbone | Input size | AP@.5 |
 | --- | --- | --- | --- |
 | Simple Baselines | darknet19 | 256 x 192 | 80.9 |
