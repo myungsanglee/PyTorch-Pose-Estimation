@@ -39,6 +39,7 @@ python inference_sbp.py --cfg configs/sbp_coco.yaml --ckpt path/to/ckpt_file
 | Train Dataset | Validation Dataset |
 | --- | --- |
 | COCO2017 Train | COCO2017 Validation |
+| 64115 images | 2693 images |
 
 ### 결과
 - Validation Dataset 결과
