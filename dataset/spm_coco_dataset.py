@@ -297,7 +297,7 @@ if __name__ == '__main__':
         output_size = cfg['output_size'],
         num_keypoints = cfg['num_keypoints'],
         sigma = cfg['sigma'],
-        workers = cfg['workers'],
+        workers = 0,
         batch_size = 1
         # batch_size = cfg['batch_size'],
         # class_labels=cfg['class_labels']
@@ -309,6 +309,9 @@ if __name__ == '__main__':
     
     # map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
     # map_metric.reset_states()
+
+    print(data_module.train_dataloader().__len__())
+    print(data_module.val_dataloader().__len__())
 
     # for img, target in data_module.train_dataloader():
     for img, target in data_module.val_dataloader():        

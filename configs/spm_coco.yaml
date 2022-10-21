@@ -30,12 +30,12 @@ conf_threshold: 0.25
 
 epochs: 365
 
-train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
-val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
-img_dir : '/home/fssv2/myungsang/datasets/coco_2017'
-# train_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_train2017.json'
-# val_path : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints/annotations/tmp_person_keypoints_val2017.json'
-# img_dir : '/home/fssv2/myungsang/datasets/coco_2017/tmp_keypoints'
+# train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
+# val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
+# img_dir : '/home/fssv2/myungsang/datasets/coco_2017'
+train_path : '/home/fssv2/myungsang/datasets/coco_2017/tiny_coco_keypoints/annotations/person_keypoints_train2017.json'
+val_path : '/home/fssv2/myungsang/datasets/coco_2017/tiny_coco_keypoints/annotations/person_keypoints_val2017.json'
+img_dir : '/home/fssv2/myungsang/datasets/coco_2017/tiny_coco_keypoints'
 workers: 32 # number of workers to generate data
 batch_size: 32
 

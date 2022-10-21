@@ -281,7 +281,7 @@ class DecodeSPM(nn.Module):
 
         root_joints = nms_spm(heatmaps, self.conf_threshold, self.dist_threshold)
 
-        keypoints_joint = get_spm_keypoints(root_joints, displacements, self.dist_threshold)
+        keypoints_joint = get_spm_keypoints(root_joints, displacements, 2)
 
         # convert joints output_size scale to input_size scale
         root_joints = root_joints * self.input_size / output_size
