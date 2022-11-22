@@ -58,3 +58,4 @@ if __name__ == '__main__':
     model = SBP(backbone_features_module, num_keypoints)
 
     summary(model, (1, 3, input_size[0], input_size[1]), device='cpu')
+    

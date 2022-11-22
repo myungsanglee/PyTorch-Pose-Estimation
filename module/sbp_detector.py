@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 
 from utils.module_select import get_optimizer, get_scheduler
 from models.loss.sbp_loss import SBPLoss
-from dataset.keypoints_utils import MeanAveragePrecision
+from dataset.keypoints_utils import SBPmAPCOCO
 
 
 class SBPDetector(pl.LightningModule):
@@ -11,7 +11,7 @@ class SBPDetector(pl.LightningModule):
         self.save_hyperparameters(ignore='model')
         self.model = model
         self.loss_fn = SBPLoss()
-        self.map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
+        self.map_metric = SBPmAPCOCO(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
 
     def forward(self, x):
         predictions = self.model(x)

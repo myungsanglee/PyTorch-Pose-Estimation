@@ -278,7 +278,7 @@ class SBPCOCODataModule(pl.LightningDataModule):
 
 
 if __name__ == '__main__':
-    from dataset.keypoints_utils import MeanAveragePrecision
+    from dataset.keypoints_utils import SBPmAPCOCO
     cfg = get_configs('./configs/sbp_coco.yaml')
 
     data_module = SBPCOCODataModule(
@@ -299,7 +299,7 @@ if __name__ == '__main__':
 
     sbp_decoder = DecodeSBP(cfg['input_size'], 0.99, False)
     
-    map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
+    map_metric = SBPmAPCOCO(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
     map_metric.reset_states()
 
     # for img, target in data_module.train_dataloader():

@@ -355,15 +355,15 @@ class DecodeSBP(nn.Module):
         return joints
 
 
-class MeanAveragePrecision:
+class SBPmAPCOCO:
     def __init__(self, json_path, input_size, conf_threshold):
-        self._coco = COCO(json_path)
-        self._input_size = input_size
-        self._decoder = DecodeSBP(input_size, conf_threshold, True)
-        self._result = []
+        self.coco = COCO(json_path)
+        self.input_size = input_size
+        self.decoder = DecodeSBP(input_size, conf_threshold, True)
+        self.result_list = []
 
     def reset_states(self):
-        self._result = []
+        self.result_list = []
 
     def update_state(self, target, y_pred):
         batch_size = y_pred.size(0)
@@ -372,11 +372,11 @@ class MeanAveragePrecision:
         cat_ids = target['category_id']
         
         for idx in range(batch_size):
-            joints = self._decoder(y_pred[idx:idx+1]) # [num_keypoints, 3]
+            joints = self.decoder(y_pred[idx:idx+1]) # [num_keypoints, 3]
             
             # convert joints input_size scale to original image scale
-            joints[..., :1] *= (bbox[idx][2] / self._input_size[1])
-            joints[..., 1:2] *= (bbox[idx][3] / self._input_size[0])
+            joints[..., :1] *= (bbox[idx][2] / self.input_size[1])
+            joints[..., 1:2] *= (bbox[idx][3] / self.input_size[0])
 
             # convert joints to original image coordinate
             joints[..., :1] += bbox[idx][0]
@@ -393,7 +393,7 @@ class MeanAveragePrecision:
                 tmp_joints.extend([float(x), float(y), 1])
                 tmp_confs.append(conf)
             
-            self._result.append({
+            self.result_list.append({
                 "image_id": int(img_ids[idx]),
                 "category_id": int(cat_ids[idx]),
                 "keypoints": tmp_joints,
@@ -403,16 +403,16 @@ class MeanAveragePrecision:
     def result(self):
         results_json_path = os.path.join(os.getcwd(), 'results.json')
         with open(results_json_path, "w") as f:
-            json.dump(self._result, f, indent=4)
+            json.dump(self.result_list, f, indent=4)
 
-        img_ids = sorted(self._coco.getImgIds())
-        cat_ids = sorted(self._coco.getCatIds())
+        img_ids = sorted(self.coco.getImgIds())
+        cat_ids = sorted(self.coco.getCatIds())
         
         # load detection JSON file from the disk
-        cocovalPrediction = self._coco.loadRes(results_json_path)
+        cocovalPrediction = self.coco.loadRes(results_json_path)
         # initialize the COCOeval object by passing the coco object with
         # ground truth annotations, coco object with detection results
-        cocoEval = COCOeval(self._coco, cocovalPrediction, "keypoints")
+        cocoEval = COCOeval(self.coco, cocovalPrediction, "keypoints")
         
         # run evaluation for each image, accumulates per image results
         # display the summary metrics of the evaluation
@@ -424,6 +424,46 @@ class MeanAveragePrecision:
         cocoEval.summarize()
 
         return cocoEval.stats[1]
+
+class SBPmAPPIS(SBPmAPCOCO):
+    def __init__(self, json_path, input_size, conf_threshold):
+        super().__init__(json_path, input_size, conf_threshold)
+
+    def update_state(self, target, y_pred):
+        batch_size = y_pred.size(0)
+        bbox = target['bbox']
+        img_ids = target['image_id']
+        cat_ids = target['category_id']
+        
+        for idx in range(batch_size):
+            joints = self.decoder(y_pred[idx:idx+1]) # [num_keypoints, 3]
+            
+            # convert joints input_size scale to original image scale
+            joints[..., :1] *= (bbox[idx][2] / self.input_size[1])
+            joints[..., 1:2] *= (bbox[idx][3] / self.input_size[0])
+
+            # convert joints to original image coordinate
+            joints[..., :1] += bbox[idx][0]
+            joints[..., 1:2] += bbox[idx][1]
+            
+            tmp_joints = []
+            tmp_confs = []
+            for (x, y, conf) in joints:
+                if conf < 0:
+                    tmp_joints.extend([0, 0, 0])
+                    tmp_confs.append(0)
+                    continue
+                
+                tmp_joints.extend([float(x), float(y), 1])
+                tmp_confs.append(conf)
+            tmp_joints.extend([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+            
+            self.result_list.append({
+                "image_id": int(img_ids[idx]),
+                "category_id": int(cat_ids[idx]),
+                "keypoints": tmp_joints,
+                "score": float(sum(tmp_confs) / joints.size(0))
+            })
 
 
 def get_tagged_img_spm(img, root_joints, keypoints_joint):
