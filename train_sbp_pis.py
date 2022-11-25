@@ -9,7 +9,7 @@ from pytorch_lightning.plugins import DDPPlugin
 from torchinfo import summary
 
 from dataset.sbp_pis_dataset import SBPPISDataModule
-from module.sbp_detector import SBPDetector
+from module.sbp_pis_detector import SBPPISDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
 from utils.utility import make_model_name
@@ -46,7 +46,7 @@ def train(cfg):
     
     summary(model, (1, cfg['in_channels'], cfg['input_size'][0], cfg['input_size'][1]), device='cpu')
 
-    model_module = SBPDetector(
+    model_module = SBPPISDetector(
         model=model, 
         cfg=cfg
     )
