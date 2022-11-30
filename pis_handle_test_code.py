@@ -1,6 +1,7 @@
 import argparse
 import time
 import os
+from tqdm import tqdm
 
 import torch
 import numpy as np
@@ -10,7 +11,7 @@ from utils.yaml_helper import get_configs
 from module.sbp_pis_detector import SBPPISDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSBP
+from dataset.keypoints_utils import DecodeSBP, HandleGrip
 from dataset.sbp_pis_dataset import SBPPISDataModule
 
 
@@ -61,16 +62,18 @@ def inference(cfg, ckpt):
 
     # set handle region
     handle_roi = ((1220, 1300), (1600, 1130))
+    handle_cls = HandleGrip(handle_roi)
     representative_image = cv2.line(representative_image, handle_roi[0], handle_roi[1], color=(255, 0, 0), thickness=2)
 
     tp = 0
     tn = 0
     fp = 0
     fn = 0
-    right_flag = False
-
+    
     # Inference
-    for img, target in data_module.val_dataloader():
+    for img, target in tqdm(data_module.val_dataloader()):
+        right_flag = False
+        
         if torch.cuda.is_available:
             img = img.cuda()
         
@@ -99,12 +102,13 @@ def inference(cfg, ckpt):
                 fn += 1
             else:
                 cv2.circle(representative_image, (right_hand[0], right_hand[1]), 2, color, -1)
-                right_flag = get_handle_grip_result(handle_roi, right_hand[:2])
+                right_flag = handle_cls.get_handle_grip_result(right_hand[:2])
                 
                 if right_flag:
                     tp += 1
                 else:
                     fn += 1
+                    
         else:
             color = (0, 0, 255)
             
@@ -112,7 +116,7 @@ def inference(cfg, ckpt):
                 fp += 1
             else:
                 cv2.circle(representative_image, (right_hand[0], right_hand[1]), 2, color, -1)
-                right_flag = get_handle_grip_result(handle_roi, right_hand[:2])
+                right_flag = handle_cls.get_handle_grip_result(right_hand[:2])
                 
                 if not right_flag:
                     tn += 1

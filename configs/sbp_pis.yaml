@@ -27,8 +27,8 @@ epochs: 100
 
 train_path : '/home/fssv2/myungsang/datasets/pis/coco_format/pis_person_keypoints_train.json'
 # val_path : '/home/fssv2/myungsang/datasets/pis/coco_format/pis_person_keypoints_valid.json'
-# val_path : '/home/fssv2/myungsang/datasets/pis/falling_down_data/pis_person_keypoints.json'
-val_path : '/home/fssv2/myungsang/datasets/pis/handle_data/pis_person_keypoints.json'
+val_path : '/home/fssv2/myungsang/datasets/pis/falling_down_data/pis_person_keypoints.json'
+# val_path : '/home/fssv2/myungsang/datasets/pis/handle_data/pis_person_keypoints.json'
 workers: 32 # number of workers to generate data
 batch_size: 256
 

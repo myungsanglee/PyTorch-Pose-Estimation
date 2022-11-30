@@ -10,7 +10,7 @@ from utils.yaml_helper import get_configs
 from module.sbp_pis_detector import SBPPISDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSBP, get_tagged_img_sbp
+from dataset.keypoints_utils import DecodeSBP
 from dataset.sbp_pis_dataset import SBPPISDataModule
 
 
@@ -67,9 +67,10 @@ def inference(cfg, ckpt):
     no_detect_list = []
     fall_gradient = []
     normal_gradient = []
-
+    
     # Inference
     for img, target in data_module.val_dataloader():
+        fall_flag = False
         if torch.cuda.is_available:
             img = img.cuda()
         
@@ -106,10 +107,11 @@ def inference(cfg, ckpt):
         gradient = (nose[1] - shoulder_center[1]) / (nose[0] - shoulder_center[0] + 1e-6)
         org = (800, 1000)
         y = 500
-        x = int(np.clip((org[0]-(y/gradient)), 0, img_w-1))
+        x = int(np.clip((org[0]-(y/(gradient + 1e-6))), 0, img_w-1))
         neg_max = -1
         pos_min = 8
-
+        
+        
         if org_img_path.split(os.sep)[-5] == 'normal':
             color = (0, 255, 0)
             
@@ -137,10 +139,10 @@ def inference(cfg, ckpt):
     cv2.line(representative_image, org, (int(np.clip((org[0]-(y/neg_max)), 0, img_w-1)), y), (255, 0, 0), 2)
     cv2.line(representative_image, org, (int(np.clip((org[0]-(y/pos_min)), 0, img_w-1)), y), (255, 0, 0), 2)
     
-    print(len(no_detect_list))
-    for no_detect in list(dict.fromkeys(no_detect_list)):
-        print(no_detect)
-    print('')
+    # print(len(no_detect_list))
+    # for no_detect in list(dict.fromkeys(no_detect_list)):
+    #     print(no_detect)
+    # print('')
     
     normal_gradient = np.array(normal_gradient)
     negative_gradient = normal_gradient[np.where(normal_gradient < 0)]

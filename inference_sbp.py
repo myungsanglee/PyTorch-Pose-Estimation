@@ -10,7 +10,7 @@ from utils.yaml_helper import get_configs
 from module.sbp_detector import SBPDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSBP, get_tagged_img_sbp
+from dataset.keypoints_utils import DecodeSBP, get_coco_tagged_img_sbp
 from dataset.sbp_coco_dataset import SBPCOCODataModule
 
 
@@ -63,6 +63,10 @@ def inference(cfg, ckpt):
         if torch.cuda.is_available:
             img = img.cuda()
         
+        bbox = target['bbox'][0]
+        org_img_path = target['image_path'][0]
+        org_img = cv2.imread(org_img_path)
+        
         before = time.time()
         with torch.no_grad():
             predictions = model_module(img)
@@ -70,17 +74,31 @@ def inference(cfg, ckpt):
         print(f'Inference: {(time.time()-before)*1000:.2f}ms')
         
         true_joints = true_decoder(target['heatmaps'])
+        
+        # convert joints input_size scale to original image scale
+        pred_joints[..., :1] *= (bbox[2] / cfg['input_size'][1])
+        pred_joints[..., 1:2] *= (bbox[3] / cfg['input_size'][0])
+        
+        true_joints[..., :1] *= (bbox[2] / cfg['input_size'][1])
+        true_joints[..., 1:2] *= (bbox[3] / cfg['input_size'][0])
+
+        # convert joints to original image coordinate
+        pred_joints[..., :1] += bbox[0]
+        pred_joints[..., 1:2] += bbox[1]
+        
+        true_joints[..., :1] += bbox[0]
+        true_joints[..., 1:2] += bbox[1]
 
         # batch_x to img
-        if torch.cuda.is_available:
-            img = img.cpu()[0].numpy()   
-        else:
-            img = img[0].numpy()   
-        img = (np.transpose(img, (1, 2, 0))*255.).astype(np.uint8).copy()
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        # if torch.cuda.is_available:
+        #     img = img.cpu()[0].numpy()   
+        # else:
+        #     img = img[0].numpy()   
+        # img = (np.transpose(img, (1, 2, 0))*255.).astype(np.uint8).copy()
+        # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-        pred_img = get_tagged_img_sbp(img, pred_joints)
-        true_img = get_tagged_img_sbp(img, true_joints)
+        pred_img = get_coco_tagged_img_sbp(org_img, pred_joints)
+        true_img = get_coco_tagged_img_sbp(org_img, true_joints)
 
         cv2.imshow('true', true_img)
         cv2.imshow('pred', pred_img)
