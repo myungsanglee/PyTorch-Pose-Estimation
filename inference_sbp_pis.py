@@ -10,7 +10,8 @@ from utils.yaml_helper import get_configs
 from module.sbp_pis_detector import SBPPISDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSBP, get_pis_tagged_img_sbp, HandleGrip, FallingDown
+from utils.sbp_utils import DecodeSBP
+from utils.sbp_pis_utils import get_pis_tagged_img_sbp, HandleGrip, FallingDown
 from dataset.sbp_pis_dataset import SBPPISDataModule
 
 

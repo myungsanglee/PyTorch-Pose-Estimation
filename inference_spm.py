@@ -10,7 +10,7 @@ from utils.yaml_helper import get_configs
 from module.spm_detector import SPMDetector
 from models.detector.spm import SPM
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSPM, get_tagged_img_spm
+from utils.spm_utils import DecodeSPM, get_tagged_img_spm
 from dataset.spm_coco_dataset import SPMCOCODataModule
 
 

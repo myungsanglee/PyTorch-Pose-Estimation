@@ -10,7 +10,7 @@ from utils.yaml_helper import get_configs
 from module.sbp_detector import SBPDetector
 from models.detector.sbp import SBP
 from utils.module_select import get_model
-from dataset.keypoints_utils import DecodeSBP, get_coco_tagged_img_sbp
+from utils.sbp_utils import DecodeSBP, get_coco_tagged_img_sbp
 from dataset.sbp_coco_dataset import SBPCOCODataModule
 
 

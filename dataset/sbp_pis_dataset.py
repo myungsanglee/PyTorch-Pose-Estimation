@@ -10,7 +10,8 @@ import pytorch_lightning as pl
 import albumentations as A
 from pycocotools.coco import COCO
 
-from dataset.keypoints_utils import SBPHeatmapGenerator, DecodeSBP
+from utils.sbp_utils import SBPHeatmapGenerator, DecodeSBP
+from utils.sbp_pis_utils import SBPmAPPIS
 from utils.yaml_helper import get_configs
 
 
@@ -268,7 +269,6 @@ class SBPPISDataModule(pl.LightningDataModule):
 
 
 if __name__ == '__main__':
-    from dataset.keypoints_utils import SBPmAPPIS
     cfg = get_configs('./configs/sbp_pis.yaml')
 
     data_module = SBPPISDataModule(

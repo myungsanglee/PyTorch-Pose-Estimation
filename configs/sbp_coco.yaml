@@ -1,4 +1,5 @@
 model : 'simple-baselines-pose'
+model_pretrained: ''
 backbone: 'darknet19'
 backbone_pretrained: '' # 'tiny-imagenet' or '' 
 dataset_name : 'coco-keypoints'
@@ -48,7 +49,7 @@ trainer_options:
   # log_every_n_steps: 7
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
-devices: [0] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
+devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 optimizer: 'sgd'
 optimizer_options:

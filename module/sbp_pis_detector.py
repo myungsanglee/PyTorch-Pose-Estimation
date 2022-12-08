@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 
 from utils.module_select import get_optimizer, get_scheduler
 from models.loss.sbp_loss import SBPLoss
-from dataset.keypoints_utils import SBPmAPPIS
+from utils.sbp_pis_utils import SBPmAPPIS
 
 
 class SBPPISDetector(pl.LightningModule):
