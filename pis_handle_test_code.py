@@ -102,7 +102,7 @@ def inference(cfg, ckpt):
             if right_hand[-1] < 0:
                 fn += 1
             else:
-                cv2.circle(representative_image, (right_hand[0], right_hand[1]), 2, color, -1)
+                cv2.circle(representative_image, (int(right_hand[0]), int(right_hand[1])), 2, color, -1)
                 right_flag = handle_cls.get_handle_grip_result(right_hand[:2])
                 
                 if right_flag:
@@ -116,7 +116,7 @@ def inference(cfg, ckpt):
             if right_hand[-1] < 0:
                 fp += 1
             else:
-                cv2.circle(representative_image, (right_hand[0], right_hand[1]), 2, color, -1)
+                cv2.circle(representative_image, (int(right_hand[0]), int(right_hand[1])), 2, color, -1)
                 right_flag = handle_cls.get_handle_grip_result(right_hand[:2])
                 
                 if not right_flag:
