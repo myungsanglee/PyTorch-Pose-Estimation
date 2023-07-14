@@ -138,8 +138,8 @@ class SBPPISDataset(Dataset):
             x2 = x1 + int(obj['clean_bbox'][2])
             y2 = y1 + int(obj['clean_bbox'][3])
 
-            joints = np.zeros((self.num_keypoints, 2), dtype=np.float)
-            joints_vis = np.zeros((self.num_keypoints), dtype=np.float)
+            joints = np.zeros((self.num_keypoints, 2))
+            joints_vis = np.zeros((self.num_keypoints))
             for ipt in range(self.num_keypoints):
                 if x1 < obj['keypoints'][ipt * 3 + 0] < x2 and y1 < obj['keypoints'][ipt * 3 + 1] < y2:                
                     joints[ipt, 0] = obj['keypoints'][ipt * 3 + 0]
@@ -154,7 +154,7 @@ class SBPPISDataset(Dataset):
 
             rec.append({
                 'image_path': file_name,
-                'bbox': np.array(obj['clean_bbox'], dtype=np.float),
+                'bbox': np.array(obj['clean_bbox']),
                 'joints': joints,
                 'joints_vis': joints_vis,
                 'image_id': img_id,

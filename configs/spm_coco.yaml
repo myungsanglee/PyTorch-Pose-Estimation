@@ -6,7 +6,7 @@ input_size: 512
 output_size: 128
 in_channels: 3
 num_keypoints : 17
-sigma: 2 # 2D Gaussian Filter, size = 6*sigma + 3
+sigma: 1 # 2D Gaussian Filter, size = 6*sigma + 3
 class_labels : [
   'nose', 
   'left_eye', 
@@ -28,7 +28,7 @@ class_labels : [
 ]
 conf_threshold: 0.25
 
-epochs: 365
+epochs: 200
 
 # train_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_train2017.json'
 # val_path : '/home/fssv2/myungsang/datasets/coco_2017/annotations/person_keypoints_val2017.json'
@@ -48,7 +48,7 @@ trainer_options:
   # log_every_n_steps: 3
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
-devices: [0] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
+devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 optimizer: 'sgd'
 optimizer_options:
@@ -59,8 +59,8 @@ optimizer_options:
 
 scheduler: 'yolo_lr'
 scheduler_options:
-  burn_in: 9000
-  steps: [350000]
+  burn_in: 1565
+  steps: [50080]
   scales: [0.1]
 
 # scheduler: 'multi_step'

@@ -30,7 +30,7 @@ class SPMLoss(nn.Module):
         batch_size = input.size(0)
         # [batch, 1 + (2*num_keypoints), output_size, output_size] to [batch, output_size, output_size, 1 + (2*num_keypoints)]
         prediction = input.permute(0, 2, 3, 1).contiguous()
-            
+        
         pred_root_joints = torch.sigmoid(prediction[..., :1]) # [batch, output_size, output_size, 1]
         pred_displacements = torch.tanh(prediction[..., 1:]) # [batch, output_size, output_size, (2*num_keypoints)]
         
@@ -54,22 +54,22 @@ class SPMLoss(nn.Module):
         # ======================== #
         #   FOR Root Joints Loss   #
         # ======================== #
-        # loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints, true_root_joints)
-        loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints * mask, true_root_joints) / (2. * num_keypoints)
+        loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints, true_root_joints)
+        # loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints * mask, true_root_joints) / (2. * num_keypoints)
         # loss_no_root_joints = self.mse_loss(pred_root_joints * n_mask, true_root_joints * n_mask) / 2.
 
         # ===================================== #
         #   FOR Body Joint Displacement LOSS    #
         # ===================================== #
-        # loss_displacements = 100 * self.sl1_loss(pred_displacements, true_displacements)
-        loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements * mask, true_displacements)
+        loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements, true_displacements)
+        # loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements * mask, true_displacements)
         # loss_no_displacements = 0.01 * self.sl1_loss(pred_displacements * n_mask, true_displacements * n_mask) / (2*num_keypoints)
 
+        loss = (loss_root_joints + loss_displacements) / batch_size
         # loss = (loss_root_joints + loss_displacements + loss_no_root_joints) / batch_size
         # loss = (loss_root_joints + loss_no_root_joints + loss_displacements + loss_no_displacements) / batch_size
         # loss = (loss_root_joints + loss_no_root_joints + loss_displacements) * batch_size
         # loss = (loss_root_joints + loss_no_root_joints + loss_displacements) / batch_size
-        loss = (loss_root_joints + loss_displacements) / batch_size
         # loss = (loss_root_joints) * batch_size
 
         # # ======================== #

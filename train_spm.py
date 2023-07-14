@@ -55,7 +55,7 @@ def train(cfg):
         ),
         EarlyStopping(
             monitor='val_loss',
-            patience=40,
+            patience=30,
             verbose=True
         )
     ]
@@ -65,7 +65,7 @@ def train(cfg):
         logger=TensorBoardLogger(cfg['save_dir'], make_model_name(cfg), default_hp_metric=False),
         accelerator=cfg['accelerator'],
         devices=cfg['devices'],
-        plugins=DDPPlugin(find_unused_parameters=False) if platform.system() != 'Windows' else None,
+        # plugins=DDPPlugin(find_unused_parameters=False) if platform.system() != 'Windows' else None,
         callbacks=callbacks,
         **cfg['trainer_options']
     )

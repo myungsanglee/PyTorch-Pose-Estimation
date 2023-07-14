@@ -3,6 +3,7 @@ import os
 import copy
 sys.path.append(os.getcwd())
 
+import torch
 from torch.utils.data import Dataset, DataLoader
 import cv2
 import numpy as np
@@ -43,6 +44,7 @@ class SPMCOCODataset(Dataset):
 
         img = cv2.imread(db_rec['image_path'])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_h, img_w, _ = img.shape
         
         joints = db_rec['joints'] # (num_person, num_keypoints, 2)
         joints_vis = db_rec['joints_vis'] # (num_person, num_keypoints)
@@ -67,12 +69,12 @@ class SPMCOCODataset(Dataset):
         
         # divide keypoints to centers & joints
         # keypoints = np.reshape(keypoints, (-1, self.num_keypoints+1, 2))
-        keypoints = np.reshape(keypoints, (-1, self.num_keypoints+1, 2)).astype(np.int)
+        keypoints = np.reshape(keypoints, (-1, self.num_keypoints+1, 2)).astype(np.int64)
         centers = keypoints[:, self.num_keypoints:, :] # (num_person, 1, 2)
         joints = keypoints[:, :self.num_keypoints, :] # (num_person, num_keypoints, 2)
         
         # get heatmaps of root joints
-        heatmaps = self.heatmap_generator(centers) # (1, output_h, output_w)
+        heatmaps = self.heatmap_generator(centers) # (num_person, output_h, output_w)
         
         # get masks
         masks = self.mask_generator(centers)
@@ -83,7 +85,13 @@ class SPMCOCODataset(Dataset):
         # concat heatmaps & displacements
         target = np.concatenate([heatmaps, displacements], axis=0) # (1 + 2*(num_keypoints), output_h, output_w)
         
-        return transformed_img, target
+        dst = dict()
+        dst['target'] = target
+        dst['image_id'] = db_rec['image_id']
+        dst['category_id'] = db_rec['category_id']
+        dst['image_size'] = [img_w, img_h]
+        
+        return transformed_img, dst
 
     def _get_img_dir(self, img_dir, file_path):
         img_dir_name = os.path.splitext(file_path.split('_')[-1])[0]
@@ -152,8 +160,8 @@ class SPMCOCODataset(Dataset):
             cx = (x1 + x2) / 2.
             cy = (y1 + y2) / 2.
 
-            joints = np.zeros((self.num_keypoints, 2), dtype=np.float)
-            joints_vis = np.zeros((self.num_keypoints), dtype=np.float)
+            joints = np.zeros((self.num_keypoints, 2))
+            joints_vis = np.zeros((self.num_keypoints))
             for ipt in range(self.num_keypoints):
                 if x1 < obj['keypoints'][ipt * 3 + 0] < x2 and y1 < obj['keypoints'][ipt * 3 + 1] < y2:                
                     joints[ipt, 0] = obj['keypoints'][ipt * 3 + 0]
@@ -319,15 +327,28 @@ if __name__ == '__main__':
         img = (img * 255).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         
+        img_w, img_h = target['image_size']
+        
+        org_img = cv2.resize(img, (int(img_w), int(img_h)))
+        
+        target = target['target']
+        
         heatmaps = target[0, 0, :, :].numpy()
         
         root_joints, keypoints_joint = spm_decoder(target)
         # map_metric.update_state(target, heatmaps)
         
+        # convert joints input_size scale to original image scale
+        root_joints[..., :1] *= (img_w / cfg['input_size'])
+        root_joints[..., 1:2] *= (img_h / cfg['input_size'])
+        
+        keypoints_joint[..., :1] *= (img_w / cfg['input_size'])
+        keypoints_joint[..., 1:2] *= (img_h / cfg['input_size'])
+        
         # Draw Root joints
         for x, y in root_joints:
             x, y = int(x), int(y)
-            cv2.circle(img, (x, y), 5, (0, 0, 255), -1)
+            cv2.circle(org_img, (x, y), 5, (0, 0, 255), -1)
         
         # Draw keypoints joint
         for joints in keypoints_joint:
@@ -335,7 +356,7 @@ if __name__ == '__main__':
                 if x == 0. and y == 0.:
                     continue
                 x, y = int(x), int(y)
-                cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
+                cv2.circle(org_img, (x, y), 3, (255, 0, 0), -1)
         
         # # Draw keypoints joint
         # for idx, (x, y, conf) in enumerate(joints):
@@ -352,9 +373,11 @@ if __name__ == '__main__':
         # heatmaps = heatmaps[0].permute((1, 2, 0)).numpy()
         # heatmaps = np.sum(heatmaps, axis=-1)
         # heatmaps = cv2.resize(heatmaps, (192, 256))
+        # print(heatmaps.shape)
+        # print(img.shape)
         
-        cv2.imshow('image', img)
         cv2.imshow('heatmaps', heatmaps)
+        cv2.imshow('image', org_img)
         key = cv2.waitKey(0)
         if key == 27:
             break

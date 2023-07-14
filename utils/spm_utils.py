@@ -1,10 +1,13 @@
 import math
-import math
+import os
+import json
 
 import torch
 from torch import nn
 import numpy as np
 import cv2
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 
 
 ################################################################################################################
@@ -274,3 +277,72 @@ def get_tagged_img_spm(img, root_joints, keypoints_joint):
 
 
     return tagged_img
+
+
+class SPMmAPCOCO:
+    def __init__(self, json_path, input_size, sigma, conf_threshold):
+        self.coco = COCO(json_path)
+        self.input_size = input_size
+        self.conf_threshold = conf_threshold
+        self.decoder = DecodeSPM(input_size, sigma, conf_threshold, True)
+        self.result_list = []
+
+    def reset_states(self):
+        self.result_list = []
+
+    def update_state(self, target, y_pred):
+        batch_size = y_pred.size(0)
+        image_sizes = target['image_size']
+        img_ids = target['image_id']
+        cat_ids = target['category_id']
+        
+        for idx in range(batch_size):
+            _, keypoints_joint = self.decoder(y_pred[idx:idx+1]) # [num_root_joints, num_keypoints, 2]
+            
+            # convert joints input_size scale to original image scale
+            keypoints_joint[..., :1] *= (image_sizes[0][idx] / self.input_size)
+            keypoints_joint[..., 1:2] *= (image_sizes[1][idx] / self.input_size)
+
+            for joints in keypoints_joint:
+                tmp_joints = []
+                for x, y in joints:
+                    if x == 0. and y == 0.:
+                        tmp_joints.extend([0, 0, 0])
+                        continue
+                    
+                    tmp_joints.extend([float(x), float(y), 1])
+            
+                self.result_list.append({
+                    "image_id": int(img_ids[idx]),
+                    "category_id": int(cat_ids[idx]),
+                    "keypoints": tmp_joints,
+                    "score": self.conf_threshold
+                })
+
+    def result(self):
+        if not self.result_list:
+            return 0
+        
+        results_json_path = os.path.join(os.getcwd(), 'results.json')
+        with open(results_json_path, "w") as f:
+            json.dump(self.result_list, f, indent=4)
+
+        img_ids = sorted(self.coco.getImgIds())
+        cat_ids = sorted(self.coco.getCatIds())
+        
+        # load detection JSON file from the disk
+        cocovalPrediction = self.coco.loadRes(results_json_path)
+        # initialize the COCOeval object by passing the coco object with
+        # ground truth annotations, coco object with detection results
+        cocoEval = COCOeval(self.coco, cocovalPrediction, "keypoints")
+        
+        # run evaluation for each image, accumulates per image results
+        # display the summary metrics of the evaluation
+        cocoEval.params.imgIds  = img_ids
+        cocoEval.params.catIds  = cat_ids
+    
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()
+
+        return cocoEval.stats[1]
