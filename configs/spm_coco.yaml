@@ -26,7 +26,7 @@ class_labels : [
   'left_ankle',
   'right_ankle'
 ]
-conf_threshold: 0.25
+conf_threshold: 0.5
 
 epochs: 200
 
@@ -48,7 +48,7 @@ trainer_options:
   # log_every_n_steps: 3
 
 accelerator: 'gpu' # 'auto', 'gpu', 'cpu'
-devices: [1] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
+devices: [0] # 'auto': use all, [0]: use 0 gpu, [0, 1]: use 0, 1 gpus
 
 optimizer: 'sgd'
 optimizer_options:

@@ -300,6 +300,9 @@ if __name__ == '__main__':
     
     map_metric = SBPmAPCOCO(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
     map_metric.reset_states()
+    
+    print(data_module.train_dataloader().__len__())
+    print(data_module.val_dataloader().__len__())
 
     # for img, target in data_module.train_dataloader():
     for img, target in data_module.val_dataloader():        

@@ -12,8 +12,10 @@ class SPMLoss(nn.Module):
     def __init__(self):
         super().__init__()
         # weight factor to balance two kinds of losses
-        self.lambda_root = 5
-        self.lambda_disp = 1
+        self.lambda_root = 1
+        self.lambda_root_negative = 1
+        self.lambda_disp = 0.1
+        self.lambda_disp_negative = 1
         
         self.mse_loss = nn.MSELoss(reduction='sum')
         self.sl1_loss = nn.SmoothL1Loss(reduction='sum')
@@ -54,36 +56,29 @@ class SPMLoss(nn.Module):
         # ======================== #
         #   FOR Root Joints Loss   #
         # ======================== #
-        loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints, true_root_joints)
+        # loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints, true_root_joints)
+        
+        loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints * mask, true_root_joints)
+        # loss_no_root_joints = self.lambda_root_negative * self.mse_loss(pred_root_joints * n_mask, true_root_joints * n_mask)
+        
         # loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints * mask, true_root_joints) / (2. * num_keypoints)
         # loss_no_root_joints = self.mse_loss(pred_root_joints * n_mask, true_root_joints * n_mask) / 2.
 
         # ===================================== #
         #   FOR Body Joint Displacement LOSS    #
         # ===================================== #
-        loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements, true_displacements)
-        # loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements * mask, true_displacements)
+        # loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements, true_displacements)
+        
+        loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements * mask, true_displacements)
+        # loss_no_displacements = self.lambda_disp_negative * self.sl1_loss(pred_displacements * n_mask, true_displacements * n_mask)
+        
+        # loss_displacements = self.lambda_disp * self.sl1_loss(pred_displacements, true_displacements)
+        
         # loss_no_displacements = 0.01 * self.sl1_loss(pred_displacements * n_mask, true_displacements * n_mask) / (2*num_keypoints)
 
         loss = (loss_root_joints + loss_displacements) / batch_size
-        # loss = (loss_root_joints + loss_displacements + loss_no_root_joints) / batch_size
-        # loss = (loss_root_joints + loss_no_root_joints + loss_displacements + loss_no_displacements) / batch_size
-        # loss = (loss_root_joints + loss_no_root_joints + loss_displacements) * batch_size
         # loss = (loss_root_joints + loss_no_root_joints + loss_displacements) / batch_size
-        # loss = (loss_root_joints) * batch_size
-
-        # # ======================== #
-        # #   FOR Root Joints Loss   #
-        # # ======================== #
-        # loss_root_joints = self.lambda_root * self.mse_loss(pred_root_joints * mask[..., 0], true_root_joints * mask[..., 0])
-        # loss_no_root_joints = self.lambda_no_root * self.mse_loss(pred_root_joints * n_mask[..., 0], true_root_joints * n_mask[..., 0])
-
-        # # ===================================== #
-        # #   FOR Body Joint Displacement LOSS    #
-        # # ===================================== #
-        # loss_positive_displacements = self.lambda_disp_pos * self.mse_loss(pred_displacements * mask, true_displacements)
-
-        # loss = (loss_root_joints + loss_no_root_joints + loss_positive_displacements) * batch_size
+        # loss = (loss_root_joints + loss_no_root_joints + loss_displacements + loss_no_displacements) / batch_size
 
         return loss
 

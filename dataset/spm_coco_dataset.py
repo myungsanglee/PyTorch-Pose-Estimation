@@ -11,12 +11,12 @@ import pytorch_lightning as pl
 import albumentations as A
 from pycocotools.coco import COCO
 
-from utils.spm_utils import SPMHeatmapGenerator, SPMDisplacementGenerator, SPMMaskGenerator, DecodeSPM
+from utils.spm_utils import SPMHeatmapGenerator, SPMDisplacementGenerator, SPMMaskGenerator, DecodeSPM, SPMmAPCOCO
 from utils.yaml_helper import get_configs
 
 
 class SPMCOCODataset(Dataset):
-    def __init__(self, img_dir, file_path, transforms, heatmap_generator, displacement_generator, mask_generator, ratio, num_keypoints):
+    def __init__(self, img_dir, file_path, transforms, heatmap_generator, displacement_generator, mask_generator, ratio, class_labels, num_keypoints):
         super().__init__()
 
         self.img_dir = self._get_img_dir(img_dir, file_path)
@@ -25,7 +25,7 @@ class SPMCOCODataset(Dataset):
         self.displacement_generator = displacement_generator
         self.mask_generator = mask_generator
         self.ratio = ratio # output_size / input_size
-        # self.class_labels = np.array(class_labels)
+        self.class_labels = np.array(class_labels)
         self.num_keypoints = num_keypoints
         
         self.coco = COCO(file_path)
@@ -202,8 +202,8 @@ class SPMCOCODataModule(pl.LightningDataModule):
         num_keypoints,
         sigma,
         workers,
-        batch_size
-        # class_labels
+        batch_size,
+        class_labels
     ):
         super().__init__()
         self.train_path = train_path
@@ -224,7 +224,7 @@ class SPMCOCODataModule(pl.LightningDataModule):
             output_size, sigma
         )
         self.ratio = self.output_size / self.input_size
-        # self.class_labels = class_labels
+        self.class_labels = class_labels
         
     def setup(self, stage=None):
         train_transforms = A.Compose([
@@ -256,7 +256,7 @@ class SPMCOCODataModule(pl.LightningDataModule):
             self.displacement_generator,
             self.mask_generator,
             self.ratio,
-            # self.class_labels,
+            self.class_labels,
             self.num_keypoints
         )
         
@@ -268,7 +268,7 @@ class SPMCOCODataModule(pl.LightningDataModule):
             self.displacement_generator,
             self.mask_generator,
             self.ratio,
-            # self.class_labels,
+            self.class_labels,
             self.num_keypoints
         )
 
@@ -305,8 +305,7 @@ if __name__ == '__main__':
         num_keypoints = cfg['num_keypoints'],
         sigma = cfg['sigma'],
         workers = 0,
-        batch_size = 1
-        # batch_size = cfg['batch_size'],
+        batch_size = 1,
         # class_labels=cfg['class_labels']
     )
     data_module.prepare_data()
@@ -314,14 +313,15 @@ if __name__ == '__main__':
 
     spm_decoder = DecodeSPM(cfg['input_size'], cfg['sigma'], 0.99, False)
     
-    # map_metric = MeanAveragePrecision(cfg['val_path'], cfg['input_size'], cfg['conf_threshold'])
-    # map_metric.reset_states()
+    map_metric = SPMmAPCOCO(cfg['val_path'], cfg['input_size'], cfg['sigma'], 0.73)
+    map_metric.reset_states()
 
     print(data_module.train_dataloader().__len__())
     print(data_module.val_dataloader().__len__())
 
-    # for img, target in data_module.train_dataloader():
-    for img, target in data_module.val_dataloader():        
+    from tqdm import tqdm
+    # for img, target in tqdm(data_module.train_dataloader()):               
+    for img, target in tqdm(data_module.val_dataloader()):               
         # convert img to opencv numpy array
         img = img[0].permute((1, 2, 0)).numpy()
         img = (img * 255).astype(np.uint8)
@@ -331,12 +331,11 @@ if __name__ == '__main__':
         
         org_img = cv2.resize(img, (int(img_w), int(img_h)))
         
-        target = target['target']
+        heatmaps = target['target'][0, 0, :, :].numpy()
         
-        heatmaps = target[0, 0, :, :].numpy()
+        root_joints, keypoints_joint = spm_decoder(target['target'])
         
-        root_joints, keypoints_joint = spm_decoder(target)
-        # map_metric.update_state(target, heatmaps)
+        map_metric.update_state(target, target['target'])
         
         # convert joints input_size scale to original image scale
         root_joints[..., :1] *= (img_w / cfg['input_size'])
@@ -345,43 +344,25 @@ if __name__ == '__main__':
         keypoints_joint[..., :1] *= (img_w / cfg['input_size'])
         keypoints_joint[..., 1:2] *= (img_h / cfg['input_size'])
         
-        # Draw Root joints
-        for x, y in root_joints:
-            x, y = int(x), int(y)
-            cv2.circle(org_img, (x, y), 5, (0, 0, 255), -1)
+    #     # Draw Root joints
+    #     for x, y, conf in root_joints:
+    #         x, y = int(x), int(y)
+    #         cv2.circle(org_img, (x, y), 5, (0, 0, 255), -1)
         
-        # Draw keypoints joint
-        for joints in keypoints_joint:
-            for x, y in joints:
-                if x == 0. and y == 0.:
-                    continue
-                x, y = int(x), int(y)
-                cv2.circle(org_img, (x, y), 3, (255, 0, 0), -1)
+    #     # Draw keypoints joint
+    #     for joints in keypoints_joint:
+    #         for x, y, conf in joints:
+    #             if x == 0. and y == 0.:
+    #                 continue
+    #             x, y = int(x), int(y)
+    #             cv2.circle(org_img, (x, y), 3, (255, 0, 0), -1)
         
-        # # Draw keypoints joint
-        # for idx, (x, y, conf) in enumerate(joints):
-        #     if conf < 0:
-        #         continue
-        #     x, y = int(x), int(y)
-        #     cv2.circle(img, (x, y), 3, (255, 0, 0), -1)
-            
-        #     margin = 10
-        #     org_x = np.clip(x, margin, cfg['input_size'][1] - margin)
-        #     org_y = np.clip(y, margin, cfg['input_size'][0] - margin)
-        #     cv2.putText(img, f'{idx}({conf:.2f})', (org_x, org_y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
-        
-        # heatmaps = heatmaps[0].permute((1, 2, 0)).numpy()
-        # heatmaps = np.sum(heatmaps, axis=-1)
-        # heatmaps = cv2.resize(heatmaps, (192, 256))
-        # print(heatmaps.shape)
-        # print(img.shape)
-        
-        cv2.imshow('heatmaps', heatmaps)
-        cv2.imshow('image', org_img)
-        key = cv2.waitKey(0)
-        if key == 27:
-            break
-    cv2.destroyAllWindows()
+    #     cv2.imshow('heatmaps', heatmaps)
+    #     cv2.imshow('image', org_img)
+    #     key = cv2.waitKey(0)
+    #     if key == 27:
+    #         break
+    # cv2.destroyAllWindows()
 
-    # map = map_metric.result()
-    # print(map)
+    map = map_metric.result()
+    print(map)

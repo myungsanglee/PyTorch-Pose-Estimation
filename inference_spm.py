@@ -68,7 +68,7 @@ def inference(cfg, ckpt):
         pred_root_joints, pred_keypoints_joint = pred_decoder(predictions)
         print(f'Inference: {(time.time()-before)*1000:.2f}ms')
         
-        true_root_joints, true_keypoints_joint = true_decoder(target)
+        true_root_joints, true_keypoints_joint = true_decoder(target['target'])
 
         # batch_x to img
         if torch.cuda.is_available:

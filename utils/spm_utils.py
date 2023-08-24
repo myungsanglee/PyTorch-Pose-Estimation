@@ -106,7 +106,7 @@ def nms_spm(heatmaps, conf_threshold=0.8, dist_threshold=7.):
         dist_threshold (float): distance threshold to remove heatmap
 
     Returns:
-        Tensor: root joints '[num_root_joints, 2]', specified as [x, y]
+        Tensor: root joints '[num_root_joints, 3]', specified as [x, y, conf]
     """
 
     yy, xx = torch.where(heatmaps[0] > conf_threshold)
@@ -155,21 +155,22 @@ def nms_spm(heatmaps, conf_threshold=0.8, dist_threshold=7.):
         else:
             break
     
-    # print(f'Root Joints Confidence: {root_joints_confidence}')
+    root_joints_confidence = torch.stack(root_joints_confidence)
+    root_joints = torch.stack(root_joints)
     
-    return torch.stack(root_joints)
+    return torch.concat([root_joints, root_joints_confidence[..., None]], dim=-1)
 
 
 def get_spm_keypoints(root_joints, displacements, dist_threshold):
     """Get Body Joint Keypoints
 
     Arguments:
-        root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y]
+        root_joints (Tensor): root joints '[num_root_joints, 3]', specified as [x, y, conf]
         displacements (Tensor): [(2*num_keypoints), output_size, output_size]
         dist_threshold (float): distance threshold to remove Joint
 
     Returns:
-        Tensor: keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y]
+        Tensor: keypoints joint '[num_root_joints, num_keypoints, 3]', specified as [x, y, conf]
     """
     num_keypoints, output_size, _ = displacements.size()
     num_keypoints = int(num_keypoints / 2)
@@ -181,22 +182,21 @@ def get_spm_keypoints(root_joints, displacements, dist_threshold):
 
     keypoints_joint = []
     for root_joint in root_joints:
-        x, y = root_joint
+        x, y, conf = root_joint
         tmp_keypoints = []
         for i in range(num_keypoints):
-            keypoints_x = displacements[(2*i)][y, x] * z + x
-            keypoints_y = displacements[(2*i + 1)][y, x] * z + y
+            keypoints_x = displacements[(2*i)][y.long(), x.long()] * z + x
+            keypoints_y = displacements[(2*i + 1)][y.long(), x.long()] * z + y
             
             # calculating distance
             d = math.sqrt((x - keypoints_x)**2 + (y - keypoints_y)**2)
             
             if d < dist_threshold:
-                tmp_keypoints.append(torch.tensor([0, 0], device=device))
+                tmp_keypoints.append(torch.tensor([0., 0., 0.], device=device))
             else:
-                # keypoints_x = keypoints_x * output_size + x
-                # keypoints_y = keypoints_y * output_size + y
-                tmp_keypoints.append(torch.stack([keypoints_x, keypoints_y]))
+                tmp_keypoints.append(torch.stack([keypoints_x, keypoints_y, conf]))
         keypoints_joint.append(torch.stack(tmp_keypoints))
+    
     return torch.stack(keypoints_joint)
 
 
@@ -212,8 +212,8 @@ class DecodeSPM(nn.Module):
                     Targets: [batch, 1 + (2*num_keypoints), output_size, output_size]
 
     Returns:
-        root_joints (Tensor): root joints '[num_root_joints, 2]', specified as [x, y], scaled input size
-        keypoints_joint (Tensor): keypoints joint '[num_root_joints, num_keypoints, 2]', specified as [x, y], scaled input size
+        root_joints (Tensor): root joints '[num_root_joints, 3]', specified as [x, y, conf], scaled input size
+        keypoints_joint (Tensor): keypoints joint '[num_root_joints, num_keypoints, 3]', specified as [x, y, conf], scaled input size
     '''
     def __init__(self, input_size, sigma, conf_threshold, pred=True):
         super().__init__()
@@ -241,11 +241,11 @@ class DecodeSPM(nn.Module):
 
         root_joints = nms_spm(heatmaps, self.conf_threshold, self.dist_threshold)
 
-        keypoints_joint = get_spm_keypoints(root_joints, displacements, 2)
+        keypoints_joint = get_spm_keypoints(root_joints, displacements, self.dist_threshold)
 
         # convert joints output_size scale to input_size scale
-        root_joints = root_joints * self.input_size / output_size
-        keypoints_joint = keypoints_joint * self.input_size / output_size
+        root_joints[..., :2] = root_joints[..., :2] * self.input_size / output_size
+        keypoints_joint[..., :2] = keypoints_joint[..., :2] * self.input_size / output_size
 
         return root_joints, keypoints_joint
 
@@ -297,7 +297,7 @@ class SPMmAPCOCO:
         cat_ids = target['category_id']
         
         for idx in range(batch_size):
-            _, keypoints_joint = self.decoder(y_pred[idx:idx+1]) # [num_root_joints, num_keypoints, 2]
+            _, keypoints_joint = self.decoder(y_pred[idx:idx+1]) # [num_root_joints, num_keypoints, 3]
             
             # convert joints input_size scale to original image scale
             keypoints_joint[..., :1] *= (image_sizes[0][idx] / self.input_size)
@@ -305,20 +305,23 @@ class SPMmAPCOCO:
 
             for joints in keypoints_joint:
                 tmp_joints = []
-                for x, y in joints:
+                tmp_confs = []
+                for x, y, conf in joints:
                     if x == 0. and y == 0.:
                         tmp_joints.extend([0, 0, 0])
+                        tmp_confs.append(0)
                         continue
                     
                     tmp_joints.extend([float(x), float(y), 1])
-            
+                    tmp_confs.append(conf)
+                    
                 self.result_list.append({
                     "image_id": int(img_ids[idx]),
                     "category_id": int(cat_ids[idx]),
                     "keypoints": tmp_joints,
-                    "score": self.conf_threshold
+                    "score": float(sum(tmp_confs) / joints.size(0))
                 })
-
+        
     def result(self):
         if not self.result_list:
             return 0
